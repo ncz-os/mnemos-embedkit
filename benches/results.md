@@ -100,9 +100,20 @@ This bench uses **`bge-small-zh-v1.5`** (BGE architecture, 512-dim, INT8/Q8 quan
 
 **The kit is model-flexible by design.** `embedkit.Engine(model="...")` swaps the model; the adapter contract is unchanged. This bench picks one model so the throughput numbers actually compare. Picking the right model for production is the operator's call, and the kit makes the swap a one-line change. **Per-platform model tuning is queued as follow-up work.**
 
-## NVIDIA Jetson — explicitly scheduled, not yet tested
+## Hardware not in this run — community contributions welcome
 
-This bench does **not** include numbers from the NVIDIA Jetson family (Orin Nano, Orin NX, AGX Orin, Thor) on embeddings. We do not have a Jetson test platform in the fleet at the time of this run; the comparison is scheduled for the future once a Jetson box is available. Jetson would slot somewhere between "small ARM mini-PC + NPU" (Cix-class) and "ARM workstation + dGPU" (Brev-class) on the spectrum, depending on which Jetson SKU. The kit ships a CUDA adapter and an L4T-aware adapter; whichever performs best on the host wins the auto-pick.
+This bench does **not** include numbers for several mainstream platforms because we don't have the hardware in the fleet today. The kit ships adapters for all of them; running the bench is a one-line change once you have the box. We'd love community-supplied numbers for these:
+
+- **NVIDIA Jetson family** (Orin Nano / Orin NX / AGX Orin / Thor) — embedding-throughput bench scheduled when a Jetson lands in the fleet. Jetson would slot somewhere between "small ARM mini-PC + NPU" and "ARM workstation + dGPU" depending on SKU. Kit ships the CUDA adapter and an L4T-aware variant.
+- **Latest Apple Silicon** — fleet has M1 Max-32, M1 Max-24, and M3 Pro. **No M4-class Mac (M4, M4 Pro, M4 Max, M4 Ultra) yet tested.** Throughput likely scales above the M1 Max-32 baseline based on Apple's per-generation gains, but **we need community verification** on the latest A-series MacBook Pro / iMac / Mac Studio. Same kit (`pip install mnemos-embedkit[all-apple]`); same `embedkit-bench`.
+- **Latest Windows ARM notebooks** — Snapdragon X Elite, X Plus, X1E in Copilot+ PCs from Microsoft Surface, Lenovo, ASUS, Dell, HP, Samsung. **Not tested today.** A native Hexagon NPU adapter via QNN SDK is queued; in the meantime, the CPU adapter and a Vulkan adapter via the Adreno iGPU should run. **Community verification welcome** on any of the X-series Copilot+ machines.
+- **AMD ROCm GPU** (Instinct, Radeon Pro, consumer Radeon RX 9000 / 7000) — kit ships `gpu-amd-rocm` via onnxruntime-rocm.
+- **AMD XDNA NPU** (Ryzen AI 7040/8040/HX, Ryzen AI Max) — kit ships `npu-amd-xdna` via VitisAI EP.
+- **Intel iGPU + NPU on a recent NUC** (Lunar Lake, Arrow Lake H) — fleet has Raptor Lake-H Refresh (PYTHIA), no Intel-NPU SKU yet.
+- **Rockchip RKNN NPU** (RK3588 / RK3576 / RK3566 — common in $50–$200 SBCs) — kit ships `npu-rockchip`.
+- **MediaTek Genio APU** — preview adapter shipped.
+
+If you run the kit on any of the above, `embedkit-bench --output your-host.summary.json` and we'll fold your numbers into a future revision of this page (PR welcome at `mnemos-os/mnemos-embedkit`).
 
 ## What was tested vs what's in flight
 
