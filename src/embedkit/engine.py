@@ -34,7 +34,9 @@ class Engine:
             )
         cls = self._lookup(adapter)
         if cls is None:
-            raise ValueError(f"Unknown adapter '{adapter}'. Use embedkit.Engine.auto() to list options.")
+            raise ValueError(
+                f"Unknown adapter '{adapter}'. Use embedkit.Engine.auto() to list options."
+            )
         ok, why = cls.is_available()
         if not ok:
             raise RuntimeError(f"Adapter '{adapter}' is not available on this host: {why}")
@@ -43,7 +45,12 @@ class Engine:
         self._adapter.warmup()
 
     @classmethod
-    def auto(cls, prefer_tier: str | None = None, model: str | None = None, **kwargs: Any) -> "Engine":
+    def auto(
+        cls,
+        prefer_tier: str | None = None,
+        model: str | None = None,
+        **kwargs: Any,
+    ) -> Engine:
         """Pick the fastest available adapter on this host.
 
         Selection policy:
@@ -90,7 +97,7 @@ class Engine:
     def close(self) -> None:
         self._adapter.close()
 
-    def __enter__(self) -> "Engine":
+    def __enter__(self) -> Engine:
         return self
 
     def __exit__(self, *exc: Any) -> None:

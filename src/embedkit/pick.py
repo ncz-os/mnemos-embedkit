@@ -6,7 +6,7 @@ by registry order or any static priority list.
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from .adapters import AbstractAdapter
 

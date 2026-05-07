@@ -15,14 +15,17 @@ _KNOWN_MODELS: dict[str, dict[str, str]] = {
         "gguf": "bge-small-zh-v1.5-q8_0.gguf",
         "cix":  "bge-small-zh-v1.5_256.cix",
         "onnx": "bge-small-zh-v1.5/model.onnx",
+        "mlx":  "bge-small-zh-v1.5",
     },
     "bge-small-en-v1.5": {
         "gguf": "bge-small-en-v1.5-q8_0.gguf",
         "onnx": "bge-small-en-v1.5/model.onnx",
+        "mlx":  "bge-small-en-v1.5",
     },
     "nomic-embed-text-v1.5": {
         "gguf": "nomic-embed-text-v1.5.Q8_0.gguf",
         "onnx": "nomic-embed-text-v1.5/model.onnx",
+        "mlx":  "nomic-embed-text-v1.5",
     },
 }
 
