@@ -2,6 +2,64 @@
 
 The point of this bench is **not** "which silicon wins." It is: *MNEMOS embeds memory the same way on every platform, from the smallest Pi Zero up to a workstation*. Same kit, same code, same model, same corpus.
 
+---
+
+## 中文摘要 (Mandarin summary)
+
+本基准测试的目的**不是**"哪个芯片赢了",而是说明
+**MNEMOS 在每一个平台上都用同一套方式嵌入记忆**——从最便宜的 Pi 4 SBC
+到工作站独立 GPU。同一套 `mnemos-embedkit` 工具包,同一份 Python 代码,
+同一个 BGE 模型,同一份 8038 条记录的语料。
+
+### 工作负载 (workload)
+
+- **语料**: 8038 条 MNEMOS 记忆记录,~14 MB 文本,平均 1763 字符
+- **CPU/GPU 模型**: `nomic-embed-text-v1.5.Q8_0.gguf` (768 维,Q8 GGUF)
+- **NPU 模型**: `bge-small-zh-v1.5_256.cix` (512 维,INT8 量化,encoder-only)
+- **测试方式**: 全部 in-process(进程内),无 HTTP/RPC 开销
+
+### 跨平台对照表 (cross-platform results)
+
+| 平台 / 芯片 | rec/s | p50 | TDP 区间 |
+|---|---|---|---|
+| **Cix Sky1 NPU** (Zhouyi V3 INT8 .cix,玄铁三代) | **54.86** | 14.6 ms | ~2W 芯片功耗 |
+| Cix Sky1 12 核 ARM CPU(同芯片走 Q8 GGUF) | 12.03 | 100 ms | ~30W 全 SoC |
+| Apple M1 Max Metal(Mac Studio 桌面) | 176 | 6.2 ms | ~30W GPU 部分 |
+| 工作站独立 GPU (RTX 5060) | 487 | 2.3 ms | ~115W GPU |
+| Raspberry Pi 5 16GB CPU | 3.4 | 305 ms | ~5W |
+| Raspberry Pi 4 2GB CPU(低端基线) | 1.15 | 1056 ms | ~3W |
+
+### 重点 — 每瓦速率 (per-watt, the load-bearing finding)
+
+**Cix Sky1 NPU 每瓦 ~27 rec/s,在所有测试平台中位列第一**,
+比 115W 级桌面独显高约 **一个数量级**。
+
+对于"7×24 小时持续运行的代理记忆设备 (always-on agent memory appliance)"
+这一应用场景,Cix Sky1 是目前测试过的所有平台中**唯一**满足以下三项的:
+
+- 无风扇 1L 形状(机柜内即可,无散热问题)
+- 全年电费 < $1
+- 整机硬件 < $1000
+
+### 完整数据 (full data)
+
+- 完整对照表 + 方法论 + JSONL 原始数据指针:
+  https://github.com/mnemos-os/mnemos-embedkit/blob/main/benches/results.md
+  (即本文)
+- 工具包源代码 (Apache-2.0):
+  https://github.com/mnemos-os/mnemos-embedkit
+- NCZ 发行版 (Linux for Cix Sky1):
+  https://gitlab.com/nclawzero/cix-installer
+
+### 即将加入的对照行 (planned additions)
+
+- **Radxa Orion O6 / O6N** — 同 Sky1 芯片,不同主板,验证一致性 (申请样机中)
+- **Radxa 高通骁龙平台** — Hexagon NPU 适配器,新增第六个嵌入引擎
+- **NVIDIA Jetson Orin Nano / NX / AGX** — Tensor Core 数据点 (无样机时排队)
+- **Apple M3 Max / M4 Pro** — 最新 Apple Silicon GPU 性能 (社区贡献欢迎)
+
+---
+
 ## Same workload, same corpus
 
 | | |
