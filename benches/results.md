@@ -2,6 +2,41 @@
 
 The point of this bench is **not** "which silicon wins." It is: *MNEMOS embeds memory the same way on every platform, from the smallest Pi Zero up to a workstation*. Same kit, same code, same model, same corpus.
 
+## Vendor-neutral by design
+
+`mnemos-embedkit` and the NCZ Linux distribution that bundles it are
+**vendor-neutral by design and intent**. Stated goals:
+
+- **All Arm silicon shipping in the marketplace** is in scope as a target
+  platform, when sample hardware can be obtained for validation. Cix Sky1
+  is the current proof-of-concept target because that's the silicon we
+  could test against first; **Qualcomm Snapdragon (Hexagon NPU), embedded
+  GPU + CUDA platforms (Jetson-class), Apple Silicon, Rockchip, MediaTek
+  Genio, and others** are on the roadmap as samples become available.
+- **x86 versions ship in parallel.** Both **Intel** (CPU + iGPU + NPU
+  via OpenVINO 2026.1) and **AMD** (Ryzen / XDNA NPU / ROCm) are first-
+  class targets. The build pipeline already supports `--platform=x86_64`;
+  only adapter-level work is gated.
+- **The NPU MNEMOS kit (`mnemos-embedkit`) is vendor-agnostic** and
+  selects the highest-tier available accelerator at runtime by detecting
+  whichever inference driver stack is present (NPU > GPU > CPU). The
+  same `Engine.auto()` call returns a Cix Zhouyi adapter on a Sky1 box,
+  a CUDA adapter on a CUDA-equipped host, an Apple-Metal/MLX adapter on
+  Apple Silicon, an OpenVINO adapter on Intel, an XDNA adapter on AMD
+  Ryzen AI, and a CPU adapter on anything else. **Same Python call, same
+  result, different silicon path.**
+- **Cross-platform benchmarks are published openly** under Apache-2.0.
+  Hardware loaners are credited; performance numbers are added as rows
+  in this table, not as competitive ammunition. The contribution path
+  back to silicon vendors (kernel/firmware/devicetree patches) is a
+  primary value-return.
+
+The bench numbers below name silicon classes by **functional category**
+(SBC, fanless mini-PC, dGPU workstation, etc.) rather than vendor SKUs
+where possible, with one exception: published Apple Silicon SKUs and
+the specific Cix Sky1 NPU model are named because they are the only
+representatives of those categories currently measured.
+
 ---
 
 ## 中文摘要 (Mandarin summary)
@@ -25,7 +60,7 @@ The point of this bench is **not** "which silicon wins." It is: *MNEMOS embeds m
 | **Cix Sky1 NPU** (Zhouyi V3 INT8 .cix,玄铁三代) | **54.86** | 14.6 ms | ~2W 芯片功耗 |
 | Cix Sky1 12 核 ARM CPU(同芯片走 Q8 GGUF) | 12.03 | 100 ms | ~30W 全 SoC |
 | Apple M1 Max Metal(Mac Studio 桌面) | 176 | 6.2 ms | ~30W GPU 部分 |
-| 工作站独立 GPU (RTX 5060) | 487 | 2.3 ms | ~115W GPU |
+| 工作站独立 GPU(消费级 8GB,~115W) | 487 | 2.3 ms | ~115W GPU |
 | Raspberry Pi 5 16GB CPU | 3.4 | 305 ms | ~5W |
 | Raspberry Pi 4 2GB CPU(低端基线) | 1.15 | 1056 ms | ~3W |
 
@@ -55,8 +90,10 @@ The point of this bench is **not** "which silicon wins." It is: *MNEMOS embeds m
 
 - **Radxa Orion O6 / O6N** — 同 Sky1 芯片,不同主板,验证一致性 (申请样机中)
 - **Radxa 高通骁龙平台** — Hexagon NPU 适配器,新增第六个嵌入引擎
-- **NVIDIA Jetson Orin Nano / NX / AGX** — Tensor Core 数据点 (无样机时排队)
+- **嵌入式 GPU + CUDA 平台** — Tensor Core 数据点 (有样机时排队)
 - **Apple M3 Max / M4 Pro** — 最新 Apple Silicon GPU 性能 (社区贡献欢迎)
+- **AMD Ryzen AI / XDNA NPU** — 新增第七个嵌入引擎 (社区或厂商样机)
+- **Intel NPU (Lunar Lake / Arrow Lake)** — 新增 OpenVINO NPU 适配器 (有样机时)
 
 ---
 
@@ -83,9 +120,9 @@ Each box is the platform it is — a $45 SBC isn't a workstation, a workstation 
 | **Apple laptop, M3 Pro** | jperlow-mlt (this Mac) | MacBook Pro 16" 2023 — Apple M3 Pro (14-core GPU) | 36 GB | ~$2500 portable workstation |
 | **Apple laptop, M1 Max-32** | ULTRA (.60) | MacBook Pro 16" 2021 — Apple M1 Max (10C CPU, **32C GPU**) | 64 GB | ~$3500 portable build host |
 | **Apple desktop, M1 Max-24** | STUDIO (.10) | Mac Studio 2022 — Apple M1 Max (10C CPU, **24C GPU**) | 32 GB | ~$2000 desktop dev workstation |
-| **Dev workstation + dGPU** | TYPHON (.61) | x86_64 + RTX 5060 (Blackwell GB206) | varies + 8 GB VRAM | ~$1800 desktop, dev work |
+| **Dev workstation + dGPU** | TYPHON (.61) | x86_64 + consumer 8 GB dGPU (current-gen, ~115 W) | varies + 8 GB VRAM | ~$1800 desktop, dev work |
 
-A datacenter NVIDIA Grace+Blackwell row (Brev rental) is a future "cloud burst" data point — same kit, just a different tier.
+A datacenter ARM-CPU + dGPU row (cloud rental) is a future "cloud burst" data point — same kit, just a different tier.
 
 ## Numbers — same model (`bge-small-zh-v1.5`), same script, same corpus, every host
 
@@ -102,8 +139,8 @@ This is the apples-to-apples table. Same BGE architecture across every row — Q
 | **jperlow-mlt** — Apple M3 Pro Metal (laptop) | **107.07** | 9.7 ms | 75.1 | BGE-Q8 GGUF, Metal n_gpu_layers=99 | done |
 | **ULTRA** — Apple M1 Max Metal (laptop, clean re-run) | **177.14** | 5.4 ms | 45.4 | BGE-Q8 GGUF, Metal n_gpu_layers=99 | done |
 | **STUDIO** — Apple M1 Max Metal (Mac Studio desktop) | **175.86** | 6.2 ms | 45.7 | BGE-Q8 GGUF, Metal n_gpu_layers=99 | done |
-| **TYPHON** — RTX 5060 (consumer 8 GB CUDA) | **486.74** | 2.3 ms | 16.5 | BGE-Q8 GGUF, CUDA n_gpu_layers=99 | done |
-| **NVIDIA Jetson** (Orin Nano / Orin NX / AGX Orin) | TBD | TBD | TBD | future bench, no test platform in fleet today | scheduled when hardware lands |
+| **TYPHON** — consumer 8 GB dGPU (current-gen, CUDA path) | **486.74** | 2.3 ms | 16.5 | BGE-Q8 GGUF, CUDA n_gpu_layers=99 | done |
+| **Embedded GPU + CUDA (Jetson-class)** (Orin Nano / Orin NX / AGX Orin) | TBD | TBD | TBD | future bench, no test platform in fleet today | scheduled when hardware lands |
 
 A separate **nomic-embed-text-v1.5.Q8_0** (768-dim) bench was also run on a subset of hosts for a different-architecture sanity check — those numbers are in the raw JSONL but not the headline table. Cix NPU does not have a compiled nomic `.cix` available today, so nomic isn't apples-to-apples cross-platform.
 
@@ -133,7 +170,7 @@ What the data is showing on this axis (numbers normalized to embeddings per watt
 | **Small ARM SBC, CPU only** | Pi 5 (in flight) | TBD (expected 1–3) | Sub-$200, sub-10 W. Lower throughput, higher per-watt-per-dollar. |
 | **Apple Silicon laptop (Metal)** | M3 Pro Metal @ ~30 rec/s on a ~30 W GPU portion | ~1 | Great for dev; not for closet appliance. |
 | **x86 mini-PC (CPU only)** | PYTHIA Intel 210H @ 2.1 rec/s on ~50 W | 0.04 | Mini-PC form factor, but no NPU on this SKU; per-watt is poor on CPU. |
-| **Workstation dGPU** | RTX 5060 @ 166 rec/s on ~115 W of GPU | 1.4 | Fastest absolute, but a closet appliance doesn't run a 115 W GPU 24/7. |
+| **Workstation dGPU** | consumer 8 GB dGPU @ 166 rec/s on ~115 W of GPU | 1.4 | Fastest absolute, but a closet appliance doesn't run a 115 W GPU 24/7. |
 
 The pattern: **per-watt is dominated by NPU-equipped small ARM systems**, not by raw GPU horsepower. That maps directly to what MNEMOS is — a memory layer that runs continuously next to the agent, not a batch indexer that runs occasionally on a big box.
 
@@ -162,7 +199,7 @@ This bench uses **`bge-small-zh-v1.5`** (BGE architecture, 512-dim, INT8/Q8 quan
 
 This bench does **not** include numbers for several mainstream platforms because we don't have the hardware in the fleet today. The kit ships adapters for all of them; running the bench is a one-line change once you have the box. We'd love community-supplied numbers for these:
 
-- **NVIDIA Jetson family** (Orin Nano / Orin NX / AGX Orin / Thor) — embedding-throughput bench scheduled when a Jetson lands in the fleet. Jetson would slot somewhere between "small ARM mini-PC + NPU" and "ARM workstation + dGPU" depending on SKU. Kit ships the CUDA adapter and an L4T-aware variant.
+- **Embedded GPU + CUDA platforms (Jetson-class SKUs)** — embedding-throughput bench scheduled when sample hardware lands in the fleet. This class slots somewhere between "small ARM mini-PC + NPU" and "ARM workstation + dGPU" depending on SKU. Kit ships the CUDA adapter; an L4T-aware variant is on the planned-adapters list.
 - **Latest Apple Silicon** — fleet has M1 Max-32, M1 Max-24, and M3 Pro. **No M4-class Mac (M4, M4 Pro, M4 Max, M4 Ultra) yet tested.** Throughput likely scales above the M1 Max-32 baseline based on Apple's per-generation gains, but **we need community verification** on the latest A-series MacBook Pro / iMac / Mac Studio. Same kit (`pip install mnemos-embedkit[all-apple]`); same `embedkit-bench`.
 - **Latest Windows ARM notebooks** — Snapdragon X Elite, X Plus, X1E in Copilot+ PCs from Microsoft Surface, Lenovo, ASUS, Dell, HP, Samsung. **Not tested today.** A native Hexagon NPU adapter via QNN SDK is queued; in the meantime, the CPU adapter and a Vulkan adapter via the Adreno iGPU should run. **Community verification welcome** on any of the X-series Copilot+ machines.
 - **AMD ROCm GPU** (Instinct, Radeon Pro, consumer Radeon RX 9000 / 7000) — kit ships `gpu-amd-rocm` via onnxruntime-rocm.
