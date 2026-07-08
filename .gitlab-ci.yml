@@ -1,0 +1,16 @@
+# GitLab CI — Python lint gate (ruff). GitLab SaaS shared runners (free OSS
+# minutes), no fleet CPU. Per GRAEAE architecture: GitLab owns the daily gate;
+# Buildkite (ncz-os) owns heavy/native builds + release artifacts.
+stages:
+  - check
+
+ruff:
+  stage: check
+  image: python:3.12-slim
+  before_script:
+    - pip install --quiet ruff
+  script:
+    - ruff check --output-format=concise .
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
