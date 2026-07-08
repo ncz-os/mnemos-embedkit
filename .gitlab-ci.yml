@@ -1,6 +1,8 @@
-# GitLab CI — Python lint gate (ruff). GitLab SaaS shared runners (free OSS
-# minutes), no fleet CPU. Per GRAEAE architecture: GitLab owns the daily gate;
-# Buildkite (ncz-os) owns heavy/native builds + release artifacts.
+# GitLab CI — Python "real errors" gate (ruff, high-signal rules only).
+# GitLab SaaS shared runners (free OSS minutes), no fleet CPU. Catches syntax
+# errors + undefined names (E9,F63,F7,F82); stylistic/style-of-imports rules
+# (E402/E501, unused imports) are intentionally NOT gated here — tighten per repo
+# later. Buildkite (ncz-os, hosted) owns heavy/native builds + release artifacts.
 stages:
   - check
 
@@ -10,7 +12,7 @@ ruff:
   before_script:
     - pip install --quiet ruff
   script:
-    - ruff check --output-format=concise .
+    - ruff check --select E9,F63,F7,F82 --output-format=concise .
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
