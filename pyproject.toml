@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mnemos-embedkit"
-version = "0.1.0-dev"
+version = "0.1.0a1"
 description = "Open embedding devkit — same API across NPU / GPU / CPU silicon (Cix, NVIDIA, AMD, Intel, Apple, Rockchip, MediaTek)"
 authors = [{ name = "Jason Perlow", email = "jperlow@gmail.com" }]
 license = "Apache-2.0"
