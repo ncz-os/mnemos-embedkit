@@ -83,7 +83,7 @@ See `benches/results.md` for the cross-platform numbers we have today (Cix Sky1 
 
 ## Reference implementation consumer
 
-`mnemos-os/mnemos` (the canonical MNEMOS memory layer) is the reference embedkit consumer. The plan is to migrate MNEMOS's embedding helper to call `embedkit.Engine(...)` directly. See `docs/mnemos-integration.md`.
+`ncz-os/mnemos` (the canonical MNEMOS memory layer) is the reference embedkit consumer. The plan is to migrate MNEMOS's embedding helper to call `embedkit.Engine(...)` directly. See `docs/mnemos-integration.md`.
 
 ## License
 

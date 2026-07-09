@@ -2,7 +2,7 @@
 
 **Status:** DESIGN draft 2026-05-07.
 **Target repo:** `perlowja/embedkit` (Apache-2.0, public OSS).
-**Reference implementation consumer:** `mnemos-os/mnemos` (MNEMOS embedding pipeline migrates to embedkit and ships as the canonical demo).
+**Reference implementation consumer:** `ncz-os/mnemos` (MNEMOS embedding pipeline migrates to embedkit and ships as the canonical demo).
 
 ---
 

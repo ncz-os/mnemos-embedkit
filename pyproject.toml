@@ -76,9 +76,9 @@ embedkit-bench  = "embedkit.bench:main"
 embedkit-doctor = "embedkit.doctor:main"
 
 [project.urls]
-Homepage = "https://github.com/mnemos-os/mnemos-embedkit"
-Repository = "https://github.com/mnemos-os/mnemos-embedkit"
-Issues = "https://github.com/mnemos-os/mnemos-embedkit/issues"
+Homepage = "https://github.com/ncz-os/mnemos-embedkit"
+Repository = "https://github.com/ncz-os/mnemos-embedkit"
+Issues = "https://github.com/ncz-os/mnemos-embedkit/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/embedkit"]

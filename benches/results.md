@@ -79,10 +79,10 @@ representatives of those categories currently measured.
 ### 完整数据 (full data)
 
 - 完整对照表 + 方法论 + JSONL 原始数据指针:
-  https://github.com/mnemos-os/mnemos-embedkit/blob/main/benches/results.md
+  https://github.com/ncz-os/mnemos-embedkit/blob/main/benches/results.md
   (即本文)
 - 工具包源代码 (Apache-2.0):
-  https://github.com/mnemos-os/mnemos-embedkit
+  https://github.com/ncz-os/mnemos-embedkit
 - NCZ 发行版 (Linux for Cix Sky1):
   https://gitlab.com/nclawzero/cix-installer
 
@@ -208,7 +208,7 @@ This bench does **not** include numbers for several mainstream platforms because
 - **Rockchip RKNN NPU** (RK3588 / RK3576 / RK3566 — common in $50–$200 SBCs) — kit ships `npu-rockchip`.
 - **MediaTek Genio APU** — preview adapter shipped.
 
-If you run the kit on any of the above, `embedkit-bench --output your-host.summary.json` and we'll fold your numbers into a future revision of this page (PR welcome at `mnemos-os/mnemos-embedkit`).
+If you run the kit on any of the above, `embedkit-bench --output your-host.summary.json` and we'll fold your numbers into a future revision of this page (PR welcome at `ncz-os/mnemos-embedkit`).
 
 ## What was tested vs what's in flight
 
