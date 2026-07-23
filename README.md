@@ -1,3 +1,11 @@
+# ⚠️ This is a mirror — the canonical repo lives on GitLab
+
+### 👉 https://gitlab.com/ncz-os/mnemos-embedkit
+
+**Source, releases, issues, merge requests, and CI all live on GitLab.** This GitHub copy is a read-only mirror and may lag. Please file issues and get releases there.
+
+---
+
 > # 📍 Moved to GitLab
 > **The canonical, authoritative home of this project is GitLab — always:**
 > ## 👉 https://gitlab.com/ncz-os/mnemos-embedkit
