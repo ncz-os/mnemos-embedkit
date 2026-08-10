@@ -5,9 +5,11 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from embedkit.adapters import cpu_llamacpp
 from embedkit.adapters.cpu_llamacpp import CPULlamaCppAdapter
 
 AVAILABLE = CPULlamaCppAdapter.is_available()[0]
@@ -31,6 +33,42 @@ def test_is_available_safe() -> None:
         assert isinstance(reason, str)
         assert reason
     assert time.perf_counter() - started < 10.0
+
+
+def test_embedding_normalized_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeLlama:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def create_embedding(self, text: str) -> dict[str, object]:
+            return {"data": [{"embedding": [3.0, 4.0]}]}
+
+    monkeypatch.setattr(
+        cpu_llamacpp.importlib,
+        "import_module",
+        lambda name: SimpleNamespace(Llama=FakeLlama),
+    )
+
+    adapter = CPULlamaCppAdapter("model.gguf")
+    assert adapter.embed("hello") == pytest.approx([0.6, 0.8])
+
+
+def test_embedding_normalization_can_be_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeLlama:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def create_embedding(self, text: str) -> dict[str, object]:
+            return {"data": [{"embedding": [3.0, 4.0]}]}
+
+    monkeypatch.setattr(
+        cpu_llamacpp.importlib,
+        "import_module",
+        lambda name: SimpleNamespace(Llama=FakeLlama),
+    )
+
+    adapter = CPULlamaCppAdapter("model.gguf", normalize=False)
+    assert adapter.embed("hello") == [3.0, 4.0]
 
 
 @pytest.mark.skipif(not AVAILABLE, reason="adapter unavailable")

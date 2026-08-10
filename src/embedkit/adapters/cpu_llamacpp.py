@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import math
 import os
 from typing import Any
 
@@ -32,6 +33,7 @@ class CPULlamaCppAdapter(AbstractAdapter):
         n_threads: int | None = None,
         n_ctx: int = 8192,
         n_gpu_layers: int | None = None,
+        normalize: bool = True,
         **kwargs: Any,
     ) -> None:
         super().__init__(model_path, **kwargs)
@@ -49,6 +51,7 @@ class CPULlamaCppAdapter(AbstractAdapter):
         )
 
         self.max_tokens = n_ctx
+        self._normalize = normalize
         self._llm: Any | None = llama_cpp.Llama(
             model_path=model_path,
             n_ctx=n_ctx,
@@ -104,4 +107,9 @@ class CPULlamaCppAdapter(AbstractAdapter):
         embedding = data[0].get("embedding")
         if embedding is None:
             raise RuntimeError("llama-cpp-python response missing embedding")
-        return [float(value) for value in embedding]
+        vector = [float(value) for value in embedding]
+        if self._normalize:
+            norm = math.sqrt(math.fsum(value * value for value in vector))
+            if norm > 0:
+                vector = [value / norm for value in vector]
+        return vector

@@ -7,6 +7,7 @@ import ctypes
 import ctypes.util
 import logging
 import os
+import sys
 from ctypes import (
     POINTER,
     Structure,
@@ -107,44 +108,71 @@ class CixZhouyiAdapter(AbstractAdapter):
         self._ctx = POINTER(context_handler_t)()
         self._chk(self._lib.noe_init_context(byref(self._ctx)), "init_context")
 
-        graph_npu = graph_config_npu_t()
-        graph_config = graph_config_t(conf_g_npu=ctypes.pointer(graph_npu))
         self._graph_id = c_uint64(0)
-        self._chk(
-            self._lib.noe_load_graph(
-                self._ctx,
-                os.fsencode(model_path),
-                byref(self._graph_id),
-                byref(graph_config),
-            ),
-            "load_graph",
-        )
-
-        desc = tensor_desc_t()
-        self._chk(
-            self._lib.noe_get_tensor_descriptor(
-                self._ctx,
-                self._graph_id,
-                NOE_TENSOR_TYPE_OUTPUT,
-                1,
-                byref(desc),
-            ),
-            "get_pooled_desc",
-        )
-        self._scale = desc.scale if desc.scale != 0 else 1.0
-        self._zero_point = desc.zero_point
-        self._pooled_size = int(desc.size)
-        if desc.data_type not in self._DTYPE_MAP:
-            known = sorted(self._DTYPE_MAP)
-            raise ValueError(f"NPU descriptor data_type={desc.data_type} not in known map {known}")
-        self._pooled_dtype = self._DTYPE_MAP[desc.data_type]
-        itemsize = np.dtype(self._pooled_dtype).itemsize
-        if self._pooled_size % itemsize != 0:
-            raise ValueError(
-                f"NPU output buffer size {self._pooled_size} not divisible by "
-                f"dtype itemsize {itemsize}"
+        graph_loaded = False
+        try:
+            graph_npu = graph_config_npu_t()
+            graph_config = graph_config_t(conf_g_npu=ctypes.pointer(graph_npu))
+            self._chk(
+                self._lib.noe_load_graph(
+                    self._ctx,
+                    os.fsencode(model_path),
+                    byref(self._graph_id),
+                    byref(graph_config),
+                ),
+                "load_graph",
             )
-        self.embed_dim = self._pooled_size // itemsize
+            graph_loaded = True
+
+            desc = tensor_desc_t()
+            self._chk(
+                self._lib.noe_get_tensor_descriptor(
+                    self._ctx,
+                    self._graph_id,
+                    NOE_TENSOR_TYPE_OUTPUT,
+                    1,
+                    byref(desc),
+                ),
+                "get_pooled_desc",
+            )
+            self._scale = desc.scale if desc.scale != 0 else 1.0
+            self._zero_point = desc.zero_point
+            self._pooled_size = int(desc.size)
+            if desc.data_type not in self._DTYPE_MAP:
+                known = sorted(self._DTYPE_MAP)
+                raise ValueError(
+                    f"NPU descriptor data_type={desc.data_type} not in known map {known}"
+                )
+            self._pooled_dtype = self._DTYPE_MAP[desc.data_type]
+            itemsize = np.dtype(self._pooled_dtype).itemsize
+            if self._pooled_size % itemsize != 0:
+                raise ValueError(
+                    f"NPU output buffer size {self._pooled_size} not divisible by "
+                    f"dtype itemsize {itemsize}"
+                )
+            self.embed_dim = self._pooled_size // itemsize
+        except Exception as init_error:
+            try:
+                if graph_loaded:
+                    self._chk(
+                        self._lib.noe_unload_graph(self._ctx, self._graph_id),
+                        "unload_graph",
+                    )
+            except Exception as cleanup_error:
+                log.error(
+                    "Cix NPU graph cleanup failed while handling %r: %s",
+                    init_error,
+                    cleanup_error,
+                )
+            try:
+                self._chk(self._lib.noe_deinit_context(self._ctx), "deinit_context")
+            except Exception as cleanup_error:
+                log.error(
+                    "Cix NPU context cleanup failed while handling %r: %s",
+                    init_error,
+                    cleanup_error,
+                )
+            raise
 
     @classmethod
     def is_available(cls) -> tuple[bool, str]:
@@ -346,7 +374,17 @@ class CixZhouyiAdapter(AbstractAdapter):
                 "get_pooled",
             )
         finally:
-            self._lib.noe_clean_job(self._ctx, job_id)
+            inference_error = sys.exception()
+            try:
+                self._chk(self._lib.noe_clean_job(self._ctx, job_id), "clean_job")
+            except Exception as cleanup_error:
+                if inference_error is None:
+                    raise
+                log.error(
+                    "Cix NPU job cleanup failed while handling %r: %s",
+                    inference_error,
+                    cleanup_error,
+                )
 
         vector = (pooled.astype(np.float32) + self._zero_point) * self._scale
         if self._normalize:
