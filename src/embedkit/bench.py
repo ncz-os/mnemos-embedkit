@@ -86,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if requested == ["all"]:
         requested = [
             str(adapter["name"])
-            for adapter in Engine.list_adapters()
+            for adapter in Engine.list_adapters(model=args.model)
             if adapter["available"]
         ]
     if not requested:

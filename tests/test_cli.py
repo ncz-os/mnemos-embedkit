@@ -71,6 +71,31 @@ def test_bench_output_matches_stdout(
     assert output.read_text(encoding="utf-8") == capsys.readouterr().out
 
 
+def test_bench_all_discovers_adapters_for_explicit_model(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    requested_models: list[str | None] = []
+
+    class FakeEngine:
+        @staticmethod
+        def list_adapters(model: str | None = None) -> list[dict[str, object]]:
+            requested_models.append(model)
+            return [{"name": "fake", "available": True}]
+
+    corpus = tmp_path / "corpus.json"
+    corpus.write_text('["hello"]', encoding="utf-8")
+    model = tmp_path / "custom.gguf"
+    model.touch()
+    monkeypatch.setattr(bench, "Engine", FakeEngine)
+    monkeypatch.setattr(bench, "_bench", lambda name, path, texts: {"adapter": name})
+
+    assert bench.main(
+        ["--corpus", str(corpus), "--engines", "all", "--model", str(model)]
+    ) == 0
+    assert requested_models == [str(model)]
+
+
 def test_doctor_reports_adapters(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

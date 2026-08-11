@@ -96,6 +96,8 @@ class CixZhouyiAdapter(AbstractAdapter):
         self._timeout_ms = timeout_ms
         self._normalize = normalize
         self._closed = False
+        self._context_initialized = False
+        self._graph_loaded = False
         self._lib_path = lib_path or self._find_libnoe_path() or "libnoe.so"
         self._lib = ctypes.CDLL(self._lib_path, mode=ctypes.RTLD_GLOBAL)
         self._bind()
@@ -107,9 +109,9 @@ class CixZhouyiAdapter(AbstractAdapter):
 
         self._ctx = POINTER(context_handler_t)()
         self._chk(self._lib.noe_init_context(byref(self._ctx)), "init_context")
+        self._context_initialized = True
 
         self._graph_id = c_uint64(0)
-        graph_loaded = False
         try:
             graph_npu = graph_config_npu_t()
             graph_config = graph_config_t(conf_g_npu=ctypes.pointer(graph_npu))
@@ -122,7 +124,7 @@ class CixZhouyiAdapter(AbstractAdapter):
                 ),
                 "load_graph",
             )
-            graph_loaded = True
+            self._graph_loaded = True
 
             desc = tensor_desc_t()
             self._chk(
@@ -151,13 +153,39 @@ class CixZhouyiAdapter(AbstractAdapter):
                     f"dtype itemsize {itemsize}"
                 )
             self.embed_dim = self._pooled_size // itemsize
+
+            input_sizes: list[int] = []
+            input_itemsize = np.dtype(np.int32).itemsize
+            provided_size = self.max_tokens * input_itemsize
+            for tensor_index in range(3):
+                input_desc = tensor_desc_t()
+                self._chk(
+                    self._lib.noe_get_tensor_descriptor(
+                        self._ctx,
+                        self._graph_id,
+                        NOE_TENSOR_TYPE_INPUT,
+                        tensor_index,
+                        byref(input_desc),
+                    ),
+                    f"get_input_desc[{tensor_index}]",
+                )
+                required_size = int(input_desc.size)
+                if required_size != provided_size:
+                    raise ValueError(
+                        f"NPU input tensor {tensor_index} requires {required_size} bytes, "
+                        f"but max_tokens={self.max_tokens} provides {provided_size} bytes"
+                    )
+                input_sizes.append(required_size)
+            self._input_sizes = tuple(input_sizes)
         except Exception as init_error:
             try:
-                if graph_loaded:
+                if self._graph_loaded:
                     self._chk(
                         self._lib.noe_unload_graph(self._ctx, self._graph_id),
                         "unload_graph",
                     )
+                    self._graph_loaded = False
+                    self._graph_id = c_uint64(0)
             except Exception as cleanup_error:
                 log.error(
                     "Cix NPU graph cleanup failed while handling %r: %s",
@@ -165,7 +193,10 @@ class CixZhouyiAdapter(AbstractAdapter):
                     cleanup_error,
                 )
             try:
-                self._chk(self._lib.noe_deinit_context(self._ctx), "deinit_context")
+                if not self._graph_loaded and self._context_initialized:
+                    self._chk(self._lib.noe_deinit_context(self._ctx), "deinit_context")
+                    self._context_initialized = False
+                    self._ctx = POINTER(context_handler_t)()
             except Exception as cleanup_error:
                 log.error(
                     "Cix NPU context cleanup failed while handling %r: %s",
@@ -200,19 +231,33 @@ class CixZhouyiAdapter(AbstractAdapter):
         ctx = getattr(self, "_ctx", None)
         graph_id = getattr(self, "_graph_id", None)
         failures: list[Exception] = []
-        if lib is not None and ctx is not None and graph_id is not None:
+        if (
+            lib is not None
+            and ctx is not None
+            and graph_id is not None
+            and self._graph_loaded
+        ):
             try:
                 self._chk(lib.noe_unload_graph(ctx, graph_id), "unload_graph")
+                self._graph_loaded = False
+                self._graph_id = c_uint64(0)
             except Exception as exc:
                 failures.append(exc)
+        if (
+            lib is not None
+            and ctx is not None
+            and self._context_initialized
+            and not self._graph_loaded
+        ):
             try:
                 self._chk(lib.noe_deinit_context(ctx), "deinit_context")
+                self._context_initialized = False
+                self._ctx = POINTER(context_handler_t)()
             except Exception as exc:
                 failures.append(exc)
         self._tokenizer = None
         if failures:
-            # Leave the adapter retryable: a later close may run after the
-            # driver has recovered. Both cleanup calls were still attempted.
+            # Leave only resources still owned by the adapter retryable.
             detail = "; ".join(str(exc) for exc in failures)
             raise RuntimeError(f"Cix NPU close failed: {detail}")
         self._closed = True
@@ -336,6 +381,15 @@ class CixZhouyiAdapter(AbstractAdapter):
             raise RuntimeError("cix-npu adapter is closed")
 
         input_ids, attention_mask, token_type_ids = self._tokenize(text)
+        inputs = (input_ids, attention_mask, token_type_ids)
+        for tensor_index, (tensor, required_size) in enumerate(
+            zip(inputs, self._input_sizes, strict=True)
+        ):
+            if tensor.nbytes != required_size:
+                raise ValueError(
+                    f"tokenizer produced {tensor.nbytes} bytes for NPU input tensor "
+                    f"{tensor_index}; graph requires {required_size} bytes"
+                )
         job_npu = job_config_npu_t()
         job_config = job_config_t(conf_j_npu=ctypes.pointer(job_npu))
         job_id = c_uint64(0)
@@ -395,7 +449,7 @@ class CixZhouyiAdapter(AbstractAdapter):
                     cleanup_error,
                 )
 
-        vector = (pooled.astype(np.float32) + self._zero_point) * self._scale
+        vector = (pooled.astype(np.float32) - self._zero_point) * self._scale
         if self._normalize:
             norm = np.linalg.norm(vector)
             if norm > 0:

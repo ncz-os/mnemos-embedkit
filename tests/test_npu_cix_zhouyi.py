@@ -56,6 +56,24 @@ class _FakeFunction:
         return self.result
 
 
+class _FakeTensorDescriptorFunction(_FakeFunction):
+    def __call__(self, *args: object) -> int:
+        self.calls += 1
+        if self.result != 0:
+            return self.result
+        tensor_type = int(args[2])
+        tensor_index = int(args[3])
+        desc = args[4]._obj  # type: ignore[attr-defined]
+        if tensor_type == npu_cix_zhouyi.NOE_TENSOR_TYPE_INPUT:
+            desc.size = 256 * np.dtype(np.int32).itemsize
+            desc.data_type = 6
+        elif tensor_index == 1:
+            desc.size = 2 * np.dtype(np.float32).itemsize
+            desc.scale = 1.0
+            desc.data_type = 7
+        return 0
+
+
 class _FakeLib:
     def __init__(self) -> None:
         for name in (
@@ -71,6 +89,7 @@ class _FakeLib:
             "noe_get_tensor_descriptor",
         ):
             setattr(self, name, _FakeFunction())
+        self.noe_get_tensor_descriptor = _FakeTensorDescriptorFunction()
 
 
 def _install_fake_runtime(monkeypatch: pytest.MonkeyPatch, lib: _FakeLib) -> None:
@@ -107,6 +126,33 @@ def test_constructor_deinitializes_context_after_graph_load_failure(
     assert lib.noe_deinit_context.calls == 1
 
 
+def test_constructor_rejects_token_length_that_mismatches_native_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lib = _FakeLib()
+    _install_fake_runtime(monkeypatch, lib)
+
+    with pytest.raises(ValueError, match="input tensor 0 requires 1024 bytes"):
+        CixZhouyiAdapter("model.cix", max_tokens=128, lib_path="libnoe.so")
+
+    assert lib.noe_unload_graph.calls == 1
+    assert lib.noe_deinit_context.calls == 1
+
+
+def test_constructor_accepts_default_length_matching_native_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lib = _FakeLib()
+    _install_fake_runtime(monkeypatch, lib)
+
+    adapter = CixZhouyiAdapter("model.cix", lib_path="libnoe.so")
+
+    assert adapter.max_tokens == 256
+    assert adapter._input_sizes == (1024, 1024, 1024)
+    assert lib.noe_get_tensor_descriptor.calls == 4
+    adapter.close()
+
+
 def _adapter_for_job_test(lib: _FakeLib) -> CixZhouyiAdapter:
     adapter = CixZhouyiAdapter.__new__(CixZhouyiAdapter)
     adapter._closed = False
@@ -119,6 +165,7 @@ def _adapter_for_job_test(lib: _FakeLib) -> CixZhouyiAdapter:
     adapter._zero_point = 0
     adapter._scale = 1.0
     adapter.embed_dim = 2
+    adapter._input_sizes = (4, 4, 4)
     adapter._tokenize = lambda text: (
         np.zeros(1, dtype=np.int32),
         np.zeros(1, dtype=np.int32),
@@ -147,23 +194,53 @@ def test_job_cleanup_failure_preserves_inference_error(caplog: pytest.LogCapture
     assert "job cleanup failed" in caplog.text
 
 
-def test_close_reports_both_failures_and_remains_retryable() -> None:
+def test_nonzero_zero_point_is_subtracted_during_dequantization() -> None:
+    lib = _FakeLib()
+    adapter = _adapter_for_job_test(lib)
+    adapter._zero_point = 5
+    adapter._scale = 2.0
+
+    assert adapter.embed("hello") == [-10.0, -10.0]
+
+
+def test_close_retries_graph_without_deinitializing_its_context() -> None:
     lib = _FakeLib()
     lib.noe_unload_graph.result = 4
+    adapter = _adapter_for_job_test(lib)
+    adapter._ctx = object()
+    adapter._tokenizer = object()
+    adapter._graph_loaded = True
+    adapter._context_initialized = True
+
+    with pytest.raises(RuntimeError, match="unload_graph"):
+        adapter.close()
+    assert lib.noe_deinit_context.calls == 0
+
+    lib.noe_unload_graph.result = 0
+    adapter.close()
+    assert lib.noe_unload_graph.calls == 2
+    assert lib.noe_deinit_context.calls == 1
+    assert adapter._closed is True
+    assert adapter._tokenizer is None
+
+
+def test_close_does_not_retry_an_unloaded_graph() -> None:
+    lib = _FakeLib()
     lib.noe_deinit_context.result = 5
     adapter = _adapter_for_job_test(lib)
     adapter._ctx = object()
     adapter._tokenizer = object()
+    adapter._graph_loaded = True
+    adapter._context_initialized = True
 
-    with pytest.raises(RuntimeError, match="unload_graph.*deinit_context"):
-        adapter.close()
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="deinit_context"):
         adapter.close()
 
-    assert lib.noe_unload_graph.calls == 2
+    lib.noe_deinit_context.result = 0
+    adapter.close()
+    assert lib.noe_unload_graph.calls == 1
     assert lib.noe_deinit_context.calls == 2
-    assert adapter._closed is False
-    assert adapter._tokenizer is None
+    assert adapter._closed is True
 
 
 def test_close_success_is_idempotent() -> None:
@@ -171,6 +248,8 @@ def test_close_success_is_idempotent() -> None:
     adapter = _adapter_for_job_test(lib)
     adapter._ctx = object()
     adapter._tokenizer = object()
+    adapter._graph_loaded = True
+    adapter._context_initialized = True
 
     adapter.close()
     adapter.close()

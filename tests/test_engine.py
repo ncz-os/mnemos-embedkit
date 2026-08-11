@@ -86,6 +86,37 @@ def test_list_adapters_is_unavailable_when_default_model_is_missing(
     assert "is not installed" in status[0]["reason"]
 
 
+def test_list_adapters_checks_the_requested_model(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class CPUAdapter(_WorkingAdapter):
+        name = "cpu-llamacpp"
+
+    class CUDAAdapter(_WorkingAdapter):
+        name = "nvidia-cuda"
+
+    class CixAdapter(_WorkingAdapter):
+        name = "cix-npu"
+
+    model = tmp_path / "custom.gguf"
+    model.touch()
+    requested: list[tuple[str, str | None]] = []
+    adapters = [CPUAdapter, CUDAAdapter, CixAdapter]
+    monkeypatch.setattr(engine, "all_adapters", lambda: adapters)
+
+    def resolve(adapter: str, model_spec: str | None) -> str:
+        requested.append((adapter, model_spec))
+        return str(model)
+
+    monkeypatch.setattr(engine, "resolve_model", resolve)
+
+    status = Engine.list_adapters(model=str(model))
+
+    assert all(adapter["available"] is True for adapter in status)
+    assert requested == [(adapter.name, str(model)) for adapter in adapters]
+
+
 def test_shipping_registry_contains_only_implemented_adapters() -> None:
     names = {adapter.name for adapter in engine.all_adapters()}
     assert names == {"cpu-llamacpp", "nvidia-cuda", "cix-npu"}

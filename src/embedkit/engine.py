@@ -119,14 +119,14 @@ class Engine:
         return None
 
     @staticmethod
-    def list_adapters() -> list[dict[str, Any]]:
+    def list_adapters(model: str | None = None) -> list[dict[str, Any]]:
         """Return [{name, tier, available, reason}] for every registered adapter."""
         out: list[dict[str, Any]] = []
         for cls in all_adapters():
             ok, why = cls.is_available()
             if ok:
                 try:
-                    Engine._existing_model_path(cls.name, None)
+                    Engine._existing_model_path(cls.name, model)
                 except (OSError, ValueError) as exc:
                     ok, why = False, str(exc)
             out.append({"name": cls.name, "tier": cls.tier, "available": ok, "reason": why})
