@@ -1,0 +1,7 @@
+{
+  "records": [
+    {"payload": {"content": "The quick brown fox jumps over the lazy dog."}},
+    {"payload": {"content": "Embedding runtimes should return stable vector dimensions."}},
+    {"payload": {"content": "This small corpus validates the benchmark command path."}}
+  ]
+}

@@ -2,7 +2,7 @@
 
 Quick start:
 
-    eng = embedkit.Engine.auto()        # picks fastest adapter on this host
+    eng = embedkit.Engine.auto(model="bge-small-zh-v1.5")
     vec = eng.embed("Hello world")
 
 Explicit adapter pick:
@@ -12,6 +12,7 @@ Explicit adapter pick:
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from .adapters import AbstractAdapter, all_adapters
@@ -40,9 +41,8 @@ class Engine:
         ok, why = cls.is_available()
         if not ok:
             raise RuntimeError(f"Adapter '{adapter}' is not available on this host: {why}")
-        model_path = resolve_model(adapter, model)
-        self._adapter: AbstractAdapter = cls(model_path=model_path, **kwargs)
-        self._adapter.warmup()
+        model_path = self._existing_model_path(adapter, model)
+        self._adapter = self._start_adapter(cls, model_path, kwargs)
 
     @classmethod
     def auto(
@@ -74,16 +74,24 @@ class Engine:
             candidates = [a for a in candidates if a.tier == prefer_tier]
             if not candidates:
                 raise RuntimeError(f"No adapter available in tier '{prefer_tier}'.")
+        failures: list[str] = []
         for tier in ("npu", "gpu", "cpu"):
             in_tier = [a for a in candidates if a.tier == tier]
-            if in_tier:
+            while in_tier:
                 cls_pick = pick_fastest_in_tier(in_tier, model=model)
+                in_tier.remove(cls_pick)
+                try:
+                    model_path = cls._existing_model_path(cls_pick.name, model)
+                    adapter_instance = cls._start_adapter(cls_pick, model_path, kwargs)
+                except Exception as exc:
+                    failures.append(f"{cls_pick.name}: {exc}")
+                    log.warning("auto-selection rejected %s: %s", cls_pick.name, exc)
+                    continue
                 eng = cls.__new__(cls)
-                model_path = resolve_model(cls_pick.name, model)
-                eng._adapter = cls_pick(model_path=model_path, **kwargs)
-                eng._adapter.warmup()
+                eng._adapter = adapter_instance
                 return eng
-        raise RuntimeError("No adapter available after tier filter.")
+        detail = "; ".join(failures) or "no candidates remained"
+        raise RuntimeError(f"No adapter could be started: {detail}")
 
     def embed(self, text: str) -> list[float]:
         return self._adapter.embed(text)
@@ -116,5 +124,38 @@ class Engine:
         out: list[dict[str, Any]] = []
         for cls in all_adapters():
             ok, why = cls.is_available()
+            if ok:
+                try:
+                    Engine._existing_model_path(cls.name, None)
+                except (OSError, ValueError) as exc:
+                    ok, why = False, str(exc)
             out.append({"name": cls.name, "tier": cls.tier, "available": ok, "reason": why})
         return out
+
+    @staticmethod
+    def _existing_model_path(adapter_name: str, model: str | None) -> str:
+        model_path = resolve_model(adapter_name, model)
+        if not Path(model_path).exists():
+            requested = "default model" if model is None else f"model {model!r}"
+            raise ValueError(
+                f"{requested} is not installed for adapter '{adapter_name}': {model_path}. "
+                "Pass a path to a provisioned model."
+            )
+        return model_path
+
+    @staticmethod
+    def _start_adapter(
+        adapter_cls: type[AbstractAdapter],
+        model_path: str,
+        kwargs: dict[str, Any],
+    ) -> AbstractAdapter:
+        adapter = adapter_cls(model_path=model_path, **kwargs)
+        try:
+            adapter.warmup()
+        except BaseException:
+            try:
+                adapter.close()
+            except Exception:
+                log.exception("adapter cleanup failed after warmup failure")
+            raise
+        return adapter

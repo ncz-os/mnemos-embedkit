@@ -75,6 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="auto, all, or a comma-separated list of adapter names",
     )
     parser.add_argument("--model", help="model name or path")
+    parser.add_argument("--output", type=Path, help="also write summary JSON to this path")
     args = parser.parse_args(argv)
 
     texts = _texts_from_corpus(args.corpus)
@@ -91,7 +92,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not requested:
         parser.error("no engines selected")
     results = [_bench(engine_name, args.model, texts) for engine_name in requested]
-    print(json.dumps(results, indent=2))
+    rendered = json.dumps(results, indent=2)
+    print(rendered)
+    if args.output is not None:
+        args.output.write_text(f"{rendered}\n", encoding="utf-8")
     return 0
 
 

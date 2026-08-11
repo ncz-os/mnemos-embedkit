@@ -35,7 +35,7 @@ def test_is_available_safe() -> None:
     assert time.perf_counter() - started < 10.0
 
 
-def test_embedding_normalized_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_embedding_preserves_native_magnitude_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeLlama:
         def __init__(self, **kwargs: object) -> None:
             pass
@@ -50,10 +50,10 @@ def test_embedding_normalized_by_default(monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
     adapter = CPULlamaCppAdapter("model.gguf")
-    assert adapter.embed("hello") == pytest.approx([0.6, 0.8])
+    assert adapter.embed("hello") == [3.0, 4.0]
 
 
-def test_embedding_normalization_can_be_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_embedding_normalization_can_be_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeLlama:
         def __init__(self, **kwargs: object) -> None:
             pass
@@ -67,8 +67,8 @@ def test_embedding_normalization_can_be_disabled(monkeypatch: pytest.MonkeyPatch
         lambda name: SimpleNamespace(Llama=FakeLlama),
     )
 
-    adapter = CPULlamaCppAdapter("model.gguf", normalize=False)
-    assert adapter.embed("hello") == [3.0, 4.0]
+    adapter = CPULlamaCppAdapter("model.gguf", normalize=True)
+    assert adapter.embed("hello") == pytest.approx([0.6, 0.8])
 
 
 @pytest.mark.skipif(not AVAILABLE, reason="adapter unavailable")

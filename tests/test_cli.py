@@ -43,6 +43,34 @@ def test_bench_command_runs_corpus(
     assert json.loads(capsys.readouterr().out)[0]["records_embedded"] == 1
 
 
+def test_bench_output_matches_stdout(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    class FakeEngine:
+        @classmethod
+        def auto(cls, model: str | None = None) -> FakeEngine:
+            return cls()
+
+        def embed(self, text: str) -> list[float]:
+            return [1.0]
+
+        def info(self) -> dict[str, object]:
+            return {"adapter": "fake", "embed_dim": 1}
+
+        def close(self) -> None:
+            pass
+
+    corpus = tmp_path / "corpus.json"
+    corpus.write_text('["hello"]', encoding="utf-8")
+    output = tmp_path / "summary.json"
+    monkeypatch.setattr(bench, "Engine", FakeEngine)
+
+    assert bench.main(["--corpus", str(corpus), "--output", str(output)]) == 0
+    assert output.read_text(encoding="utf-8") == capsys.readouterr().out
+
+
 def test_doctor_reports_adapters(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

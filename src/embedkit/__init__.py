@@ -3,7 +3,7 @@
 Quick start:
 
     import embedkit
-    eng = embedkit.Engine.auto()
+    eng = embedkit.Engine.auto(model="/path/to/model")
     vec = eng.embed("Hello world")
 
 See docs/DESIGN.md for architecture.

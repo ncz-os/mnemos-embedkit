@@ -18,6 +18,7 @@ venv/
 benches/results/*.jsonl
 benches/results/*.log
 benches/corpora/*.json
+!benches/corpora/smoke.json
 
 # Models — never commit
 *.gguf

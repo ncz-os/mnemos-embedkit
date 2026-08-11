@@ -182,7 +182,7 @@ Skip a test if the adapter is not available on the test host (`@pytest.mark.skip
 After all adapters land, run:
 
 ```bash
-embedkit-bench --corpus benches/corpora/mnemos-8038.json --engines all
+embedkit-bench --corpus benches/corpora/smoke.json --engines all --model bge-small-zh-v1.5
 ```
 
 Output should match the numbers in `benches/results.md` within ±15%. If a number is off by more than that, suspect a bug in the adapter or in test methodology — investigate before publishing.

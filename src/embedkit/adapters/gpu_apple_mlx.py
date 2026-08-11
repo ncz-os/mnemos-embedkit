@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import importlib
 import logging
-import platform
 from typing import Any, cast
 
 import numpy as np
@@ -45,16 +44,7 @@ class AppleMLXAdapter(AbstractAdapter):
 
     @classmethod
     def is_available(cls) -> tuple[bool, str]:
-        if platform.system() != "Darwin" or platform.machine() != "arm64":
-            return False, "Apple MLX requires Apple Silicon macOS"
-        try:
-            importlib.import_module("mlx.core")
-            importlib.import_module("mlx_lm")
-        except ImportError as exc:
-            return False, f"mlx/mlx_lm missing: {exc}"
-        except Exception as exc:
-            return False, f"mlx/mlx_lm probe failed: {exc}"
-        return True, "mlx + mlx_lm present on Apple Silicon"
+        return False, "unsupported: mlx_lm is a language-model runtime, not an embedding runtime"
 
     def embed(self, text: str) -> list[float]:
         return self.embed_batch([text])[0]

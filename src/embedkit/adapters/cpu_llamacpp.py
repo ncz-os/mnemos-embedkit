@@ -33,7 +33,7 @@ class CPULlamaCppAdapter(AbstractAdapter):
         n_threads: int | None = None,
         n_ctx: int = 8192,
         n_gpu_layers: int | None = None,
-        normalize: bool = True,
+        normalize: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(model_path, **kwargs)

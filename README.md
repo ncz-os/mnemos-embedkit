@@ -8,16 +8,16 @@
 
 # mnemos-embedkit
 
-> Open embedding devkit. Same API, every silicon.
+> Open embedding devkit. Same API across supported runtimes.
 
-`embedkit` lets you embed text once and run it on whatever hardware your box has — Cix Sky1 NPU, Apple Silicon Metal/MLX, NVIDIA CUDA/TensorRT, AMD ROCm/XDNA, Intel iGPU/NPU via OpenVINO, MediaTek APU, Rockchip RKNN, or just the CPU. The kit detects what's installed and picks the fastest adapter at runtime. **No vendor preference.**
+`embedkit` lets you embed text once and run it through one of the adapters implemented today: Cix Sky1 NPU, NVIDIA CUDA through ONNX Runtime, or llama.cpp on CPU. The kit detects installed runtimes and picks the highest-tier adapter that can load the model you provide. **No vendor preference.**
 
 ## Quick start
 
 ```python
 import embedkit
 
-eng = embedkit.Engine.auto()              # picks the fastest adapter on this host
+eng = embedkit.Engine.auto(model="bge-small-zh-v1.5")
 vec = eng.embed("Hello world")            # -> List[float]
 vecs = eng.embed_batch(["a", "b", "c"])   # -> List[List[float]]
 
@@ -29,11 +29,9 @@ eng.info()
 Explicit adapter pick:
 
 ```python
-eng = embedkit.Engine(adapter="cix-npu",      model="bge-small-zh-v1.5")
-eng = embedkit.Engine(adapter="nvidia-cuda",  model="nomic-embed-text-v1.5")
-eng = embedkit.Engine(adapter="amd-rocm",     model="bge-large-en-v1.5")
-eng = embedkit.Engine(adapter="apple-mlx",    model="mxbai-embed-large-v1")
-eng = embedkit.Engine(adapter="cpu-llamacpp", model="bge-small-zh-v1.5")
+eng = embedkit.Engine(adapter="cix-npu", model="/models/bge-small-zh-v1.5/model.cix")
+eng = embedkit.Engine(adapter="nvidia-cuda", model="/models/bge-small-zh-v1.5/model.onnx")
+eng = embedkit.Engine(adapter="cpu-llamacpp", model="/models/bge-small-zh-v1.5/model.gguf")
 ```
 
 ## What the kit is
@@ -44,46 +42,35 @@ A pure-Python adapter layer over vendor-specific embedding runtimes, plus a unif
 |---|---|
 | `cix-noe-umd 2.0.2` + `libnoe` (NCZ Magnetar / cixtech apt) | `npu-cix` adapter |
 | `onnxruntime-gpu` (CUDA driver from Linux distro) | `nvidia-cuda` adapter |
-| `tensorrt` python (NVIDIA tar/apt) | `nvidia-trt` adapter |
-| `onnxruntime-rocm` (AMD ROCm dkms) | `amd-rocm` adapter |
-| `onnxruntime-vitisai` (XDNA driver) | `amd-xdna` adapter |
-| `openvino` (Intel CPU/iGPU/NPU) | `intel-igpu` / `intel-npu` adapter |
-| `mlx` (Apple Silicon, macOS only) | `apple-mlx` adapter |
-| llama-cpp-python with Metal | `cpu-llamacpp` adapter (auto-detects Metal at runtime) |
-| llama-cpp-python with `-DGGML_VULKAN=1` | `gpu-vulkan` adapter |
-| `rknn-toolkit2` (Rockchip RK3588 / RK3576) | `rockchip-rknn` adapter |
-| `mtk-genio-apu` (MediaTek Genio) | `mediatek-apu` adapter |
-| nothing else | `cpu-llamacpp` (CPU baseline, ships GGUF) |
+| `llama-cpp-python` | `cpu-llamacpp` adapter |
+
+Models are not bundled or downloaded. Pass a path to a model provisioned for the selected adapter. Short model names resolve beneath `EMBEDKIT_MODELS_DIR` (default `/opt/ncz/models`) and must already exist.
 
 ## Install
 
 ```bash
 # Pick the form-factor bundle that matches your host:
-pip install embedkit[all-cpu]                 # baseline, CPU only
-pip install embedkit[all-x86-cuda]            # CPU + NVIDIA CUDA
-pip install embedkit[all-x86-rocm]            # CPU + AMD ROCm + XDNA
-pip install embedkit[all-x86-intel]           # CPU + Intel iGPU + NPU via OpenVINO
-pip install embedkit[all-arm-cix]             # CPU + Cix NPU + Mali Vulkan
-pip install embedkit[all-arm-rockchip]        # CPU + Rockchip RKNN + Mali Vulkan
-pip install embedkit[all-apple]               # CPU + Apple MLX + Metal
-pip install embedkit[all]                     # everything
+pip install "mnemos-embedkit[all-cpu] @ git+https://gitlab.com/ncz-os/mnemos-embedkit.git"
+pip install "mnemos-embedkit[all-x86-cuda] @ git+https://gitlab.com/ncz-os/mnemos-embedkit.git"
+pip install "mnemos-embedkit[all-arm-cix] @ git+https://gitlab.com/ncz-os/mnemos-embedkit.git"
+pip install "mnemos-embedkit[all] @ git+https://gitlab.com/ncz-os/mnemos-embedkit.git"
 ```
 
-The kit pulls vendor *python bindings* from PyPI. Vendor *drivers* are managed by your OS package manager (cix-noe-umd via apt, nvidia-driver via ubuntu-drivers, rocm-dkms via amdgpu-install, intel-npu-driver via apt, etc.).
+The kit pulls vendor *python bindings* from PyPI. Vendor *drivers* are managed by your OS package manager (for example, cix-noe-umd via apt or an NVIDIA driver supplied by the Linux distribution).
 
 ## Reference bench
 
-The canonical multi-platform bench is in `benches/`. Run on your host:
+The included smoke corpus is in `benches/`. From a source checkout, run:
 
 ```bash
-embedkit-bench --corpus benches/corpora/mnemos-8038.json --engines auto
+embedkit-bench --corpus benches/corpora/smoke.json --engines auto --model bge-small-zh-v1.5
 ```
 
 See `benches/results.md` for the cross-platform numbers we have today (Cix Sky1 NPU, Apple Silicon Metal, NVIDIA CUDA, x86 + ARM CPU, Pi 5, Pi 4).
 
 ## Reference implementation consumer
 
-`ncz-os/mnemos` (the canonical MNEMOS memory layer) is the reference embedkit consumer. The plan is to migrate MNEMOS's embedding helper to call `embedkit.Engine(...)` directly. See `docs/mnemos-integration.md`.
+MNEMOS does not currently import this package. Integration with `ncz-os/mnemos` remains planned work; installing Embedkit alone does not change MNEMOS ingest routing.
 
 ## License
 
@@ -91,7 +78,7 @@ Apache-2.0.
 
 ## Status
 
-**Bootstrap.** Design + cross-platform bench data exist. Adapter implementations are queued (Codex handoff prompt at `docs/CODEX-ADAPTER-HANDOFF.md`).
+**Pre-alpha.** CPU llama.cpp, NVIDIA CUDA, and Cix NPU adapters are implemented. Other backends described in the design documents remain roadmap items and are not installable extras.
 
 See `docs/DESIGN.md` for the full architecture.
 

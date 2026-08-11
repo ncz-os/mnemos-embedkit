@@ -1,5 +1,9 @@
 # embedkit — open embedding devkit for heterogeneous edge SoCs
 
+> **Roadmap document:** the shipping pre-alpha currently registers only
+> `cpu-llamacpp`, `nvidia-cuda`, and `cix-npu`. Other adapters below are
+> proposed architecture, not implemented or installable backends.
+
 **Status:** DESIGN draft 2026-05-07.
 **Target repo:** `perlowja/embedkit` (Apache-2.0, public OSS).
 **Reference implementation consumer:** `ncz-os/mnemos` (MNEMOS embedding pipeline migrates to embedkit and ships as the canonical demo).
@@ -47,7 +51,7 @@ embedkit does **not bundle vendor drivers, kernel modules, or closed-source SDKs
 |---|---|---|
 | **OS / image** | Kernel modules, vendor userspace runtimes, model loader libs | NCZ Magnetar/Reinhardt bakes `cix-noe-umd 2.0.2` + `libnoe`; Ubuntu ships NVIDIA drivers via `ubuntu-drivers`; AMD ships `rocm-dkms`; Intel ships `intel-npu-driver`. |
 | **OS package manager / PyPI** | Userspace SDKs and python bindings | `pip install onnxruntime-gpu` (CUDA), `pip install onnxruntime-rocm` (AMD ROCm), `pip install openvino` (Intel), `pip install mlx` (Apple). |
-| **embedkit (this kit)** | Adapter shims + uniform Engine API + bench harness | `pip install embedkit[all]` (or per-vendor extras). Detects what the host has, uses it. |
+| **embedkit (this kit)** | Adapter shims + uniform Engine API + bench harness | `pip install mnemos-embedkit[all]` (or a supported runtime extra). Detects what the host has, uses it. |
 
 This separation is intentional. Embedkit must run on any box without privilege, without rewriting `/etc`, without a custom kernel. If the host has CUDA installed, the CUDA adapter works. If it has Cix Zhouyi UMD installed, the Cix adapter works. If it has nothing but a CPU, the llama-cpp-python adapter works. **No silicon is preferred or required.**
 
@@ -248,7 +252,7 @@ Single source of truth: `pyproject.toml`. `uv` picks the right Python version, r
 
 ```toml
 [project]
-name = "embedkit"
+name = "mnemos-embedkit"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -286,14 +290,10 @@ gpu-vulkan       = ["llama-cpp-python>=0.3"]   # built with -DGGML_VULKAN=1
 # Bundled extras — convenience installs for common box classes.
 # These do NOT prefer any vendor; they reflect what tends to be
 # present on a given form factor.
-all-cpu          = ["embedkit[cpu-llamacpp,cpu-sbert]"]
-all-x86-cuda     = ["embedkit[cpu-llamacpp,gpu-nvidia-cuda]"]
-all-x86-rocm     = ["embedkit[cpu-llamacpp,gpu-amd-rocm,npu-amd-xdna]"]
-all-x86-intel    = ["embedkit[cpu-llamacpp,gpu-intel-igpu,npu-intel]"]
-all-arm-cix      = ["embedkit[cpu-llamacpp,npu-cix,gpu-vulkan]"]
-all-arm-rockchip = ["embedkit[cpu-llamacpp,npu-rockchip,gpu-vulkan]"]
-all-apple        = ["embedkit[cpu-llamacpp,cpu-sbert,gpu-apple-mlx]"]
-all              = ["embedkit[all-cpu,all-x86-cuda,all-x86-rocm,all-x86-intel,all-arm-cix,all-arm-rockchip,all-apple]"]
+all-cpu          = ["mnemos-embedkit[cpu-llamacpp]"]
+all-x86-cuda     = ["mnemos-embedkit[cpu-llamacpp,gpu-nvidia-cuda]"]
+all-arm-cix      = ["mnemos-embedkit[cpu-llamacpp,npu-cix]"]
+all              = ["mnemos-embedkit[all-cpu,all-x86-cuda,all-arm-cix]"]
 
 [project.scripts]
 embedkit-bench = "embedkit.bench:main"
@@ -311,12 +311,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/perlowja/embedkit
 cd embedkit
 uv sync --extra cpu-llamacpp
-uv run embedkit-bench --corpus benches/corpora/mnemos-8k.json
+uv run embedkit-bench --corpus benches/corpora/smoke.json --model bge-small-zh-v1.5
 # → produces results.json + appends to leaderboard
 
 # On a Cix box:
 uv sync --extra npu-cix
-uv run embedkit-bench --engine cix-npu --corpus benches/corpora/mnemos-8k.json
+uv run embedkit-bench --engine cix-npu --corpus benches/corpora/smoke.json --model bge-small-zh-v1.5
 ```
 
 ---

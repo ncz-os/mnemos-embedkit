@@ -1,7 +1,7 @@
 """Model name -> path resolver.
 
 Initial registry is intentionally minimal. Each adapter knows the model
-formats it accepts (gguf / onnx / cix / rknn / xdna / mlx). The caller
+formats it accepts (GGUF, ONNX, or Cix). The caller
 either passes a full path or a known short name.
 """
 from __future__ import annotations
@@ -15,17 +15,14 @@ _KNOWN_MODELS: dict[str, dict[str, str]] = {
         "gguf": "bge-small-zh-v1.5-q8_0.gguf",
         "cix":  "bge-small-zh-v1.5_256.cix",
         "onnx": "bge-small-zh-v1.5/model.onnx",
-        "mlx":  "bge-small-zh-v1.5",
     },
     "bge-small-en-v1.5": {
         "gguf": "bge-small-en-v1.5-q8_0.gguf",
         "onnx": "bge-small-en-v1.5/model.onnx",
-        "mlx":  "bge-small-en-v1.5",
     },
     "nomic-embed-text-v1.5": {
         "gguf": "nomic-embed-text-v1.5.Q8_0.gguf",
         "onnx": "nomic-embed-text-v1.5/model.onnx",
-        "mlx":  "nomic-embed-text-v1.5",
     },
 }
 
@@ -34,18 +31,8 @@ _MODEL_ROOT = Path(os.environ.get("EMBEDKIT_MODELS_DIR", "/opt/ncz/models"))
 # Per-adapter known formats. Used to map adapter -> "what file extension to look for".
 _ADAPTER_FORMAT: dict[str, str] = {
     "cpu-llamacpp":     "gguf",
-    "cpu-sbert":        "onnx",
     "cix-npu":          "cix",
     "nvidia-cuda":      "onnx",
-    "nvidia-trt":       "onnx",
-    "amd-rocm":         "onnx",
-    "amd-xdna":         "onnx",
-    "intel-igpu":       "onnx",
-    "intel-npu":        "onnx",
-    "apple-mlx":        "mlx",
-    "rockchip-rknn":    "rknn",
-    "mediatek-apu":     "onnx",
-    "vulkan":           "gguf",
 }
 
 

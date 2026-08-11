@@ -196,17 +196,26 @@ class CixZhouyiAdapter(AbstractAdapter):
     def close(self) -> None:
         if self._closed:
             return
-        self._closed = True
         lib = getattr(self, "_lib", None)
         ctx = getattr(self, "_ctx", None)
         graph_id = getattr(self, "_graph_id", None)
-        try:
-            if lib is not None and ctx is not None and graph_id is not None:
-                lib.noe_unload_graph(ctx, graph_id)
-                lib.noe_deinit_context(ctx)
-        except Exception as exc:
-            log.debug("Cix NPU close failed: %s", exc)
+        failures: list[Exception] = []
+        if lib is not None and ctx is not None and graph_id is not None:
+            try:
+                self._chk(lib.noe_unload_graph(ctx, graph_id), "unload_graph")
+            except Exception as exc:
+                failures.append(exc)
+            try:
+                self._chk(lib.noe_deinit_context(ctx), "deinit_context")
+            except Exception as exc:
+                failures.append(exc)
         self._tokenizer = None
+        if failures:
+            # Leave the adapter retryable: a later close may run after the
+            # driver has recovered. Both cleanup calls were still attempted.
+            detail = "; ".join(str(exc) for exc in failures)
+            raise RuntimeError(f"Cix NPU close failed: {detail}")
+        self._closed = True
 
     @staticmethod
     def _resolve_tokenizer_path(model_path: str, tokenizer_path: str | None) -> Path:

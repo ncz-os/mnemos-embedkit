@@ -147,6 +147,39 @@ def test_job_cleanup_failure_preserves_inference_error(caplog: pytest.LogCapture
     assert "job cleanup failed" in caplog.text
 
 
+def test_close_reports_both_failures_and_remains_retryable() -> None:
+    lib = _FakeLib()
+    lib.noe_unload_graph.result = 4
+    lib.noe_deinit_context.result = 5
+    adapter = _adapter_for_job_test(lib)
+    adapter._ctx = object()
+    adapter._tokenizer = object()
+
+    with pytest.raises(RuntimeError, match="unload_graph.*deinit_context"):
+        adapter.close()
+    with pytest.raises(RuntimeError):
+        adapter.close()
+
+    assert lib.noe_unload_graph.calls == 2
+    assert lib.noe_deinit_context.calls == 2
+    assert adapter._closed is False
+    assert adapter._tokenizer is None
+
+
+def test_close_success_is_idempotent() -> None:
+    lib = _FakeLib()
+    adapter = _adapter_for_job_test(lib)
+    adapter._ctx = object()
+    adapter._tokenizer = object()
+
+    adapter.close()
+    adapter.close()
+
+    assert lib.noe_unload_graph.calls == 1
+    assert lib.noe_deinit_context.calls == 1
+    assert adapter._closed is True
+
+
 @pytest.mark.skipif(not AVAILABLE, reason="adapter unavailable")
 def test_embed_dim_consistent() -> None:
     adapter = CixZhouyiAdapter(

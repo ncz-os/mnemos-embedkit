@@ -119,7 +119,7 @@ for a in embedkit.Engine.list_adapters():
     print(f"{a['tier']:3s} {a['name']:18s} {a['available']!s:5s} {a['reason']}")
 # npu cix-npu             True  ...
 
-eng = embedkit.Engine.auto()   # picks cix-npu when libnoe + /dev/aipu are present
+eng = embedkit.Engine.auto(model="/path/to/bge-small-zh-v1.5_256.cix")
 vec = eng.embed("hello world")
 print(eng.info())
 ```
@@ -130,9 +130,9 @@ print(eng.info())
 docker run -p 5002:5002 -v mnemos-data:/data ghcr.io/ncz-os/mnemos:latest
 ```
 
-Point MNEMOS at the venv above (or install `mnemos-embedkit` into whatever
-environment MNEMOS runs in) — it calls `embedkit.Engine.auto()` on ingest
-with no manual embedding step or per-model wiring.
+MNEMOS core does not currently import Embedkit and has its own embedding
+backend selection. Installing this package into the MNEMOS environment does
+not enable Cix routing. A separate MNEMOS integration change is required.
 
 ## Troubleshooting
 
