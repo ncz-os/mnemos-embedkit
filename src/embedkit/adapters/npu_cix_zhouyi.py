@@ -209,9 +209,16 @@ class CixZhouyiAdapter(AbstractAdapter):
     def is_available(cls) -> tuple[bool, str]:
         if not Path("/dev/aipu").exists():
             return False, "/dev/aipu not present (Cix NPU not in this kernel)"
+        configured_path = os.environ.get("EMBEDKIT_CIX_LIBNOE")
+        if configured_path and not Path(configured_path).is_file():
+            return False, f"configured libnoe path is not a file: {configured_path}"
         lib_path = cls._find_libnoe_path()
         if lib_path is None:
             return False, "libnoe not found in dynamic loader path or Cix install paths"
+        try:
+            ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
+        except OSError as exc:
+            return False, f"libnoe could not be loaded ({lib_path}): {exc}"
         return True, f"libnoe + /dev/aipu present ({lib_path})"
 
     def embed(self, text: str) -> list[float]:

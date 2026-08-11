@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from types import TracebackType
 from typing import Any
 
 from .adapters import AbstractAdapter, all_adapters
@@ -108,8 +109,21 @@ class Engine:
     def __enter__(self) -> Engine:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
-        self.close()
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        if exc_type is None:
+            self.close()
+            return
+        try:
+            self.close()
+        except Exception as cleanup_error:
+            if exc_value is not None:
+                exc_value.add_note(f"Engine cleanup also failed: {cleanup_error}")
+            log.exception("engine cleanup failed while handling %r", exc_value)
 
     @staticmethod
     def _lookup(name: str) -> type[AbstractAdapter] | None:
@@ -135,11 +149,21 @@ class Engine:
     @staticmethod
     def _existing_model_path(adapter_name: str, model: str | None) -> str:
         model_path = resolve_model(adapter_name, model)
-        if not Path(model_path).exists():
+        path = Path(model_path)
+        if not path.is_file():
             requested = "default model" if model is None else f"model {model!r}"
             raise ValueError(
                 f"{requested} is not installed for adapter '{adapter_name}': {model_path}. "
                 "Pass a path to a provisioned model."
+            )
+        adapter_cls = Engine._lookup(adapter_name)
+        if adapter_cls is None:
+            raise ValueError(f"Unknown adapter '{adapter_name}'")
+        actual_format = path.suffix.removeprefix(".").lower()
+        if actual_format != adapter_cls.model_format.lower():
+            raise ValueError(
+                f"Model {model_path!r} has format '{actual_format or 'unknown'}', but adapter "
+                f"'{adapter_name}' requires '{adapter_cls.model_format}'."
             )
         return model_path
 

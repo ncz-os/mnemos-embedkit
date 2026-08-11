@@ -95,26 +95,60 @@ def test_list_adapters_checks_the_requested_model(
 
     class CUDAAdapter(_WorkingAdapter):
         name = "nvidia-cuda"
+        model_format = "onnx"
 
     class CixAdapter(_WorkingAdapter):
         name = "cix-npu"
+        model_format = "cix"
 
-    model = tmp_path / "custom.gguf"
-    model.touch()
-    requested: list[tuple[str, str | None]] = []
     adapters = [CPUAdapter, CUDAAdapter, CixAdapter]
     monkeypatch.setattr(engine, "all_adapters", lambda: adapters)
+    for suffix, compatible_adapter in (
+        ("gguf", "cpu-llamacpp"),
+        ("onnx", "nvidia-cuda"),
+        ("cix", "cix-npu"),
+    ):
+        model = tmp_path / f"custom.{suffix}"
+        model.touch()
 
-    def resolve(adapter: str, model_spec: str | None) -> str:
-        requested.append((adapter, model_spec))
-        return str(model)
+        status = Engine.list_adapters(model=str(model))
 
-    monkeypatch.setattr(engine, "resolve_model", resolve)
+        assert [item["name"] for item in status if item["available"]] == [compatible_adapter]
 
-    status = Engine.list_adapters(model=str(model))
 
-    assert all(adapter["available"] is True for adapter in status)
-    assert requested == [(adapter.name, str(model)) for adapter in adapters]
+class _CleanupFailureAdapter(_WorkingAdapter):
+    name = "cleanup-failure"
+
+    def close(self) -> None:
+        raise RuntimeError("cleanup failed")
+
+
+def test_context_preserves_body_exception_when_cleanup_also_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = tmp_path / "model.gguf"
+    model.touch()
+    monkeypatch.setattr(engine, "all_adapters", lambda: [_CleanupFailureAdapter])
+
+    with pytest.raises(ValueError, match="inference failed") as exc_info:
+        with Engine(adapter=_CleanupFailureAdapter.name, model=str(model)):
+            raise ValueError("inference failed")
+
+    assert exc_info.value.__notes__ == ["Engine cleanup also failed: cleanup failed"]
+
+
+def test_context_propagates_cleanup_failure_without_body_exception(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = tmp_path / "model.gguf"
+    model.touch()
+    monkeypatch.setattr(engine, "all_adapters", lambda: [_CleanupFailureAdapter])
+
+    with pytest.raises(RuntimeError, match="cleanup failed"):
+        with Engine(adapter=_CleanupFailureAdapter.name, model=str(model)):
+            pass
 
 
 def test_shipping_registry_contains_only_implemented_adapters() -> None:

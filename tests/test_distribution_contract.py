@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import tomllib
+from importlib.metadata import version
 from pathlib import Path
 
+import embedkit
 from embedkit.bench import _texts_from_corpus
 
 ROOT = Path(__file__).parents[1]
+
+
+def test_public_version_matches_distribution_metadata() -> None:
+    assert embedkit.__version__ == version("mnemos-embedkit")
 
 
 def test_primary_install_instructions_use_distribution_name() -> None:

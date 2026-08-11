@@ -10,7 +10,13 @@ See docs/DESIGN.md for architecture.
 """
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 from .engine import Engine
 
-__version__ = "0.1.0-dev"
+try:
+    __version__ = version("mnemos-embedkit")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
+
 __all__ = ["Engine", "__version__"]

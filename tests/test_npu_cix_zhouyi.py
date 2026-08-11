@@ -46,6 +46,67 @@ def test_is_available_safe() -> None:
     assert time.perf_counter() - started < 10.0
 
 
+def test_configured_missing_library_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EMBEDKIT_CIX_LIBNOE", "/definitely/missing/libnoe.so")
+    original_exists = Path.exists
+    monkeypatch.setattr(
+        Path,
+        "exists",
+        lambda path: str(path) == "/dev/aipu" or original_exists(path),
+    )
+
+    ok, reason = CixZhouyiAdapter.is_available()
+
+    assert ok is False
+    assert reason == "configured libnoe path is not a file: /definitely/missing/libnoe.so"
+
+
+def test_configured_unloadable_library_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    library = tmp_path / "libnoe.so"
+    library.touch()
+    monkeypatch.setenv("EMBEDKIT_CIX_LIBNOE", str(library))
+    original_exists = Path.exists
+    monkeypatch.setattr(
+        Path,
+        "exists",
+        lambda path: str(path) == "/dev/aipu" or original_exists(path),
+    )
+    monkeypatch.setattr(
+        npu_cix_zhouyi.ctypes,
+        "CDLL",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("invalid ELF header")),
+    )
+
+    ok, reason = CixZhouyiAdapter.is_available()
+
+    assert ok is False
+    assert "invalid ELF header" in reason
+
+
+def test_configured_loadable_library_is_available(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    library = tmp_path / "libnoe.so"
+    library.touch()
+    monkeypatch.setenv("EMBEDKIT_CIX_LIBNOE", str(library))
+    original_exists = Path.exists
+    monkeypatch.setattr(
+        Path,
+        "exists",
+        lambda path: str(path) == "/dev/aipu" or original_exists(path),
+    )
+    monkeypatch.setattr(npu_cix_zhouyi.ctypes, "CDLL", lambda *args, **kwargs: object())
+
+    ok, reason = CixZhouyiAdapter.is_available()
+
+    assert ok is True
+    assert str(library) in reason
+
+
 class _FakeFunction:
     def __init__(self, result: int = 0) -> None:
         self.result = result
