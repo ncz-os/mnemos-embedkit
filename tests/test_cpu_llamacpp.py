@@ -35,7 +35,11 @@ def test_is_available_safe() -> None:
     assert time.perf_counter() - started < 10.0
 
 
-def test_embedding_preserves_native_magnitude_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_embedding_is_l2_normalized_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Every other adapter (cuda, mlx, cix) defaults normalize=True. When this one
+    # defaulted to False, Engine.auto() wrote unit vectors on GPU/NPU hosts and
+    # native-magnitude vectors after a CPU fallback into the SAME index, so
+    # similarity scores depended on which machine happened to embed the text.
     class FakeLlama:
         def __init__(self, **kwargs: object) -> None:
             pass
@@ -50,7 +54,7 @@ def test_embedding_preserves_native_magnitude_by_default(monkeypatch: pytest.Mon
     )
 
     adapter = CPULlamaCppAdapter("model.gguf")
-    assert adapter.embed("hello") == [3.0, 4.0]
+    assert adapter.embed("hello") == [0.6, 0.8]
 
 
 def test_embedding_normalization_can_be_enabled(monkeypatch: pytest.MonkeyPatch) -> None:

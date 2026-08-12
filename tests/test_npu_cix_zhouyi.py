@@ -255,13 +255,18 @@ def test_job_cleanup_failure_preserves_inference_error(caplog: pytest.LogCapture
     assert "job cleanup failed" in caplog.text
 
 
-def test_nonzero_zero_point_is_subtracted_during_dequantization() -> None:
+def test_nonzero_zero_point_is_added_during_dequantization() -> None:
+    # The Zhouyi descriptor's zero_point is ADDED, not subtracted: this matches
+    # the original implementation (49a0157) and benches/scripts/cix_npu_bench.py,
+    # which produced the published Cix numbers against the same tensor_desc_t
+    # fields. A later fix round inverted the sign and this test was rewritten to
+    # lock the regression in, so correcting the code alone was not enough.
     lib = _FakeLib()
     adapter = _adapter_for_job_test(lib)
     adapter._zero_point = 5
     adapter._scale = 2.0
 
-    assert adapter.embed("hello") == [-10.0, -10.0]
+    assert adapter.embed("hello") == [10.0, 10.0]
 
 
 def test_close_retries_graph_without_deinitializing_its_context() -> None:

@@ -456,7 +456,7 @@ class CixZhouyiAdapter(AbstractAdapter):
                     cleanup_error,
                 )
 
-        vector = (pooled.astype(np.float32) - self._zero_point) * self._scale
+        vector = (pooled.astype(np.float32) + self._zero_point) * self._scale
         if self._normalize:
             norm = np.linalg.norm(vector)
             if norm > 0:
