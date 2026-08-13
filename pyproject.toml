@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mnemos-embedkit"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Open embedding devkit for Cix NPU, NVIDIA CUDA, and llama.cpp CPU runtimes"
 authors = [{ name = "Jason Perlow", email = "jperlow@gmail.com" }]
 license = "Apache-2.0"
