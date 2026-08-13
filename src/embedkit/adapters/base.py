@@ -60,7 +60,7 @@ class AbstractAdapter(ABC):
 
     def info(self) -> dict[str, object]:
         """Introspection blob for `Engine.info()`."""
-        return {
+        info: dict[str, object] = {
             "adapter": self.name,
             "tier": self.tier,
             "model_format": self.model_format,
@@ -68,3 +68,7 @@ class AbstractAdapter(ABC):
             "embed_dim": self.embed_dim,
             "max_tokens": self.max_tokens,
         }
+        batch_size = getattr(self, "batch_size", None)
+        if batch_size is not None:
+            info["batch_size"] = batch_size
+        return info

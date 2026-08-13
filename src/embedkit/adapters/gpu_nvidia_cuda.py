@@ -29,11 +29,14 @@ class NvidiaCUDAAdapter(AbstractAdapter):
         *,
         tokenizer_path: str | None = None,
         max_tokens: int = 512,
+        batch_size: int = 16,
         normalize: bool = True,
         provider_options: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(model_path, **kwargs)
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero")
         ort = importlib.import_module("onnxruntime")
         transformers = importlib.import_module("transformers")
 
@@ -53,12 +56,14 @@ class NvidiaCUDAAdapter(AbstractAdapter):
             str(self._resolve_tokenizer_path(model_path, tokenizer_path))
         )
         self.max_tokens = max_tokens
+        self.batch_size = batch_size
         self._normalize = normalize
         self._input_meta = list(self._session.get_inputs())
         self._output_names = [output.name for output in self._session.get_outputs()]
 
-        sample = self.embed("warmup")
-        self.embed_dim = len(sample)
+        self.embed_dim = self._embedding_dimension_from_metadata()
+        if self.embed_dim == 0:
+            self.embed_dim = len(self.embed("warmup"))
 
     @classmethod
     def is_available(cls) -> tuple[bool, str]:
@@ -83,6 +88,14 @@ class NvidiaCUDAAdapter(AbstractAdapter):
         if self._session is None or self._tokenizer is None:
             raise RuntimeError("nvidia-cuda adapter is closed")
 
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), self.batch_size):
+            vectors.extend(self._embed_chunk(texts[start : start + self.batch_size]))
+        return vectors
+
+    def _embed_chunk(self, texts: list[str]) -> list[list[float]]:
+        if self._session is None or self._tokenizer is None:
+            raise RuntimeError("nvidia-cuda adapter is closed")
         encoded = self._tokenizer(
             texts,
             padding=True,
@@ -102,6 +115,23 @@ class NvidiaCUDAAdapter(AbstractAdapter):
     def close(self) -> None:
         self._session = None
         self._tokenizer = None
+
+    def _embedding_dimension_from_metadata(self) -> int:
+        outputs = list(self._session.get_outputs()) if self._session is not None else []
+        preferred_names = ("sentence", "embedding", "pooler")
+        for dimensions in (2, 3):
+            ordered = [
+                output
+                for token in preferred_names
+                for output in outputs
+                if token in output.name.lower() and len(output.shape) == dimensions
+            ]
+            ordered.extend(output for output in outputs if len(output.shape) == dimensions)
+            for output in ordered:
+                width = output.shape[-1]
+                if isinstance(width, int) and width > 0:
+                    return width
+        return 0
 
     @staticmethod
     def _resolve_tokenizer_path(model_path: str, tokenizer_path: str | None) -> Path:

@@ -62,8 +62,10 @@ class CPULlamaCppAdapter(AbstractAdapter):
             **llama_kwargs,
         )
 
-        sample = self._create_embedding("warmup")
-        self.embed_dim = len(sample)
+        n_embd = getattr(self._llm, "n_embd", None)
+        self.embed_dim = int(n_embd()) if callable(n_embd) else 0
+        if self.embed_dim <= 0:
+            self.embed_dim = len(self._create_embedding("warmup"))
 
     @classmethod
     def is_available(cls) -> tuple[bool, str]:

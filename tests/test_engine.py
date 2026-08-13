@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -69,6 +71,32 @@ def test_auto_falls_through_after_warmup_failure(
 
     assert selected.info()["adapter"] == "working"
     assert _WarmupFailureAdapter.closed == 1
+    selected.close()
+
+
+def test_auto_does_not_probe_lower_tiers_after_success(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = tmp_path / "model.gguf"
+    model.touch()
+
+    class NPUAdapter(_WorkingAdapter):
+        name = "npu"
+        tier = "npu"
+
+    class LowerAdapter(_WorkingAdapter):
+        name = "lower"
+
+        @classmethod
+        def is_available(cls) -> tuple[bool, str]:
+            raise AssertionError("lower tier should not be probed")
+
+    monkeypatch.setattr(engine, "all_adapters", lambda: [NPUAdapter, LowerAdapter])
+
+    selected = Engine.auto(model=str(model))
+
+    assert selected.info()["adapter"] == "npu"
     selected.close()
 
 
@@ -154,3 +182,23 @@ def test_context_propagates_cleanup_failure_without_body_exception(
 def test_shipping_registry_contains_only_implemented_adapters() -> None:
     names = {adapter.name for adapter in engine.all_adapters()}
     assert names == {"cpu-llamacpp", "nvidia-cuda", "cix-npu"}
+
+
+def test_import_does_not_load_numpy_or_adapter_implementations() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys, embedkit; "
+                "print('numpy' in sys.modules); "
+                "print(sorted(m for m in sys.modules "
+                "if m.startswith('embedkit.adapters.')))"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.splitlines() == ["False", "['embedkit.adapters.base']"]

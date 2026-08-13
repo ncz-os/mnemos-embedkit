@@ -16,7 +16,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
-from .adapters import AbstractAdapter, all_adapters
+from .adapters import AbstractAdapter, AdapterSpec, all_adapters
 from .models import resolve_model
 
 log = logging.getLogger("embedkit.engine")
@@ -65,19 +65,17 @@ class Engine:
         """
         from .pick import pick_fastest_in_tier  # local import to break cycle
 
-        candidates = [a for a in all_adapters() if a.is_available()[0]]
-        if not candidates:
-            raise RuntimeError(
-                "No embed adapter available on this host. "
-                "Install at minimum: pip install mnemos-embedkit[cpu-llamacpp]"
-            )
-        if prefer_tier:
-            candidates = [a for a in candidates if a.tier == prefer_tier]
-            if not candidates:
-                raise RuntimeError(f"No adapter available in tier '{prefer_tier}'.")
         failures: list[str] = []
-        for tier in ("npu", "gpu", "cpu"):
-            in_tier = [a for a in candidates if a.tier == tier]
+        tiers = (prefer_tier,) if prefer_tier else ("npu", "gpu", "cpu")
+        registered = all_adapters()
+        for tier in tiers:
+            # Probe one tier at a time. Once a higher tier starts successfully,
+            # lower-tier runtimes are never imported into this process.
+            in_tier = [
+                adapter
+                for adapter in registered
+                if adapter.tier == tier and adapter.is_available()[0]
+            ]
             while in_tier:
                 cls_pick = pick_fastest_in_tier(in_tier, model=model)
                 in_tier.remove(cls_pick)
@@ -91,6 +89,13 @@ class Engine:
                 eng = cls.__new__(cls)
                 eng._adapter = adapter_instance
                 return eng
+        if prefer_tier and not failures:
+            raise RuntimeError(f"No adapter available in tier '{prefer_tier}'.")
+        if not failures:
+            raise RuntimeError(
+                "No embed adapter available on this host. "
+                "Install at minimum: pip install mnemos-embedkit[cpu-llamacpp]"
+            )
         detail = "; ".join(failures) or "no candidates remained"
         raise RuntimeError(f"No adapter could be started: {detail}")
 
@@ -126,7 +131,7 @@ class Engine:
             log.exception("engine cleanup failed while handling %r", exc_value)
 
     @staticmethod
-    def _lookup(name: str) -> type[AbstractAdapter] | None:
+    def _lookup(name: str) -> AdapterSpec | None:
         for cls in all_adapters():
             if cls.name == name:
                 return cls
@@ -169,7 +174,7 @@ class Engine:
 
     @staticmethod
     def _start_adapter(
-        adapter_cls: type[AbstractAdapter],
+        adapter_cls: AdapterSpec | type[AbstractAdapter],
         model_path: str,
         kwargs: dict[str, Any],
     ) -> AbstractAdapter:

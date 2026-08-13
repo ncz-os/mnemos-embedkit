@@ -23,7 +23,6 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.26",
-    "transformers>=4.40",
 ]
 
 # Optional extras — install only what your host can use.
@@ -33,9 +32,9 @@ dependencies = [
 [project.optional-dependencies]
 cpu-llamacpp     = ["llama-cpp-python>=0.3"]
 # Cix
-npu-cix          = []  # cix-noe-umd from OS apt; libnoe wheel from /usr/share/cix/pypi
+npu-cix          = ["transformers>=4.40"]  # libnoe is supplied by the Cix OS image
 # NVIDIA
-gpu-nvidia-cuda  = ["onnxruntime-gpu>=1.18"]
+gpu-nvidia-cuda  = ["onnxruntime-gpu>=1.18", "transformers>=4.40"]
 
 # Bundled extras — convenience installs for common box classes.
 # These do NOT prefer any vendor; they reflect what tends to be

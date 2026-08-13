@@ -7,17 +7,24 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-
-from .adapters import AbstractAdapter
+from typing import Protocol, TypeVar
 
 log = logging.getLogger("embedkit.pick")
 
 
+class _NamedCandidate(Protocol):
+    @property
+    def name(self) -> str: ...
+
+
+CandidateT = TypeVar("CandidateT", bound=_NamedCandidate)
+
+
 def pick_fastest_in_tier(
-    candidates: Iterable[type[AbstractAdapter]],
+    candidates: Iterable[CandidateT],
     *,
     model: str | None = None,
-) -> type[AbstractAdapter]:
+) -> CandidateT:
     """Return the fastest adapter class for this host within the candidate set.
 
     For now, returns the first candidate (alphabetical) — the micro-bench

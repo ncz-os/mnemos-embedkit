@@ -34,6 +34,10 @@ eng = embedkit.Engine(adapter="nvidia-cuda", model="/models/bge-small-zh-v1.5/mo
 eng = embedkit.Engine(adapter="cpu-llamacpp", model="/models/bge-small-zh-v1.5/model.gguf")
 ```
 
+CUDA batch calls are chunked to at most 16 records by default to bound peak
+inference memory. Set `batch_size` explicitly when constructing a CUDA engine
+to tune throughput for the host, for example `batch_size=32`.
+
 ## What the kit is
 
 A pure-Python adapter layer over vendor-specific embedding runtimes, plus a uniform `Engine.embed*` API and a canonical bench harness. **The kit does not bundle drivers or kernel modules.** It detects what the host OS already provides and binds to it:

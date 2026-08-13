@@ -35,6 +35,20 @@ def test_packaging_advertises_only_implemented_runtime_extras() -> None:
     }
 
 
+def test_transformers_is_installed_only_with_tokenizer_using_runtimes() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+
+    assert not any(dependency.startswith("transformers") for dependency in project["dependencies"])
+    assert any(
+        dependency.startswith("transformers")
+        for dependency in project["optional-dependencies"]["gpu-nvidia-cuda"]
+    )
+    assert any(
+        dependency.startswith("transformers")
+        for dependency in project["optional-dependencies"]["npu-cix"]
+    )
+
+
 def test_included_smoke_corpus_is_readable() -> None:
     texts = _texts_from_corpus(ROOT / "benches" / "corpora" / "smoke.json")
     assert len(texts) == 3
