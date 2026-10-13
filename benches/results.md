@@ -117,7 +117,7 @@ Each box is the platform it is — a $45 SBC isn't a workstation, a workstation 
 | **SBC, mid** | bigpi (.65) | Raspberry Pi 5 Model B | 16 GB | $120 board, homelab, agent prototyping |
 | **mini-PC with NPU** | NCZ Magnetar / .66 | Minisforum MS-R1 — Cix Sky1 ARM64 12-core + Mali-G720 + Zhouyi V3 NPU | 64 GB | ~$700 fanless 1L appliance, always-on agent memory |
 | **mini-PC, current-gen Intel** | PYTHIA / .67 | ASUS NUC 15 Pro (NUC15CRH-B) — Intel Core 5 210H | 32 GB | ~$700–900 1L mini-PC, dev/server |
-| **Apple laptop, M3 Pro** | jperlow-mlt (this Mac) | MacBook Pro 16" 2023 — Apple M3 Pro (14-core GPU) | 36 GB | ~$2500 portable workstation |
+| **Apple laptop, M3 Pro** | MBP-M3 (this Mac) | MacBook Pro 16" 2023 — Apple M3 Pro (14-core GPU) | 36 GB | ~$2500 portable workstation |
 | **Apple laptop, M1 Max-32** | ULTRA (.60) | MacBook Pro 16" 2021 — Apple M1 Max (10C CPU, **32C GPU**) | 64 GB | ~$3500 portable build host |
 | **Apple desktop, M1 Max-24** | STUDIO (.10) | Mac Studio 2022 — Apple M1 Max (10C CPU, **24C GPU**) | 32 GB | ~$2000 desktop dev workstation |
 | **Dev workstation + dGPU** | TYPHON (.61) | x86_64 + consumer 8 GB dGPU (current-gen, ~115 W) | varies + 8 GB VRAM | ~$1800 desktop, dev work |
@@ -136,7 +136,7 @@ This is the apples-to-apples table. Same BGE architecture across every row — Q
 | **NCZ Magnetar** — Cix Zhouyi V3 NPU (INT8 .cix) | **54.86** | 14.6 ms | 146 | `bge-small-zh-v1.5_256.cix`, libnoe 2.0.0 | done |
 | **PYTHIA** — Intel Core 5 210H CPU | **12.69** | 88.8 ms | 633 | BGE-Q8 GGUF, n_ctx=8192 | done |
 | **PYTHIA** — Intel iGPU via OpenVINO | TBD | TBD | TBD | OpenVINO BGE model | queued (peer iGPU bench) |
-| **jperlow-mlt** — Apple M3 Pro Metal (laptop) | **107.07** | 9.7 ms | 75.1 | BGE-Q8 GGUF, Metal n_gpu_layers=99 | done |
+| **MBP-M3** — Apple M3 Pro Metal (laptop) | **107.07** | 9.7 ms | 75.1 | BGE-Q8 GGUF, Metal n_gpu_layers=99 | done |
 | **ULTRA** — Apple M1 Max Metal (laptop, clean re-run) | **177.14** | 5.4 ms | 45.4 | BGE-Q8 GGUF, Metal n_gpu_layers=99 | done |
 | **STUDIO** — Apple M1 Max Metal (Mac Studio desktop) | **175.86** | 6.2 ms | 45.7 | BGE-Q8 GGUF, Metal n_gpu_layers=99 | done |
 | **TYPHON** — consumer 8 GB dGPU (current-gen, CUDA path) | **486.74** | 2.3 ms | 16.5 | BGE-Q8 GGUF, CUDA n_gpu_layers=99 | done |
@@ -217,7 +217,7 @@ Same MNEMOS. Same kit. Same in-process API call (`Llama.create_embedding(text)` 
 ## What's still in flight
 
 - **PYTHIA Intel CPU bench** — finishing now (~25 min ETA from earlier sample).
-- **Mac M3 Pro Metal** — running here on jperlow-mlt, ~33 rec/s sustained at last sample.
+- **Mac M3 Pro Metal** — running here on MBP-M3, ~33 rec/s sustained at last sample.
 - **bigpi (Pi 5 16GB)** — venv + llama-cpp-python build in progress; bench will run after.
 - **zeropi (Pi 4 2GB)** — same; n_ctx reduced to 4096 to keep memory pressure low on a 2 GB board.
 - **ULTRA M1 Max Metal** — same.
